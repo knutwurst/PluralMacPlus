@@ -23,7 +23,7 @@ final class RunningInstancesManager: ObservableObject {
     /// Set of running instance IDs
     @Published private(set) var runningInstanceIds: Set<UUID> = []
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "RunningInstancesManager")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "RunningInstancesManager")
     private var cancellables = Set<AnyCancellable>()
     private var refreshTimer: Timer?
     

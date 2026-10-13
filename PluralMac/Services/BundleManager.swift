@@ -22,7 +22,7 @@ actor BundleManager {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "BundleManager")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "BundleManager")
     private let fileManager = FileManager.default
     
     /// Base directory for all PluralMac data
@@ -154,7 +154,7 @@ actor BundleManager {
         let originalVersion = originalBundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         
         // Generate unique bundle identifier
-        let newBundleIdentifier = "com.mtech.pluralmac.\(instance.id.uuidString.lowercased())"
+        let newBundleIdentifier = "com.knutwurst.pluralmacplus.\(instance.id.uuidString.lowercased())"
         let executableName = sanitizeExecutableName(instance.name)
         
         // Create plist dictionary

@@ -17,7 +17,7 @@ env:
 
 jobs:
   build:
-    name: Build PluralMac
+    name: Build PluralMac Plus
     runs-on: macos-15  # macOS Sequoia with Xcode 26.2
 
     steps:
@@ -45,33 +45,33 @@ jobs:
       - name: Prepare App Bundle
         run: |
           # Find the built app
-          APP_PATH=$(find build -name "PluralMac.app" -type d | head -1)
+          APP_PATH=$(find build -name "PluralMac Plus.app" -type d | head -1)
           echo "Found app at: $APP_PATH"
           
           # Create output directory
           mkdir -p artifacts
           
-          # Copy app to artifacts
-          cp -R "$APP_PATH" artifacts/
+          # Copy app to artifacts (folder without space; the app still shows as "PluralMac Plus")
+          cp -R "$APP_PATH" artifacts/PluralMacPlus.app
           
           # Create ZIP for distribution
           cd artifacts
-          zip -r -y PluralMac.zip PluralMac.app
+          zip -r -y PluralMacPlus.zip PluralMacPlus.app
           
           echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
 
       - name: Upload App Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PluralMac-${{ github.sha }}
-          path: artifacts/PluralMac.app
+          name: PluralMacPlus-${{ github.sha }}
+          path: artifacts/PluralMacPlus.app
           retention-days: 30
 
       - name: Upload ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PluralMac-${{ github.sha }}-zip
-          path: artifacts/PluralMac.zip
+          name: PluralMacPlus-${{ github.sha }}-zip
+          path: artifacts/PluralMacPlus.zip
           retention-days: 30
 
   # Release job - only runs on version tags
@@ -85,8 +85,8 @@ jobs:
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
-          name: PluralMac-${{ github.sha }}
-          path: release/PluralMac.app
+          name: PluralMacPlus-${{ github.sha }}
+          path: release/PluralMacPlus.app
 
       - name: Get Version
         id: version
@@ -96,15 +96,15 @@ jobs:
         run: |
           cd release
           # Ensure proper permissions
-          chmod -R 755 PluralMac.app
+          chmod -R 755 PluralMacPlus.app
           # Create ZIP preserving symlinks and resource forks
-          ditto -c -k --sequesterRsrc --keepParent PluralMac.app "PluralMac-${{ steps.version.outputs.VERSION }}-macOS.zip"
+          ditto -c -k --sequesterRsrc --keepParent PluralMacPlus.app "PluralMacPlus-${{ steps.version.outputs.VERSION }}-macOS.zip"
           ls -la
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/PluralMac-${{ steps.version.outputs.VERSION }}-macOS.zip
+          files: release/PluralMacPlus-${{ steps.version.outputs.VERSION }}-macOS.zip
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}

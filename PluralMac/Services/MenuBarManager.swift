@@ -22,7 +22,7 @@ final class MenuBarManager: NSObject, ObservableObject {
     // MARK: - Properties
     
     private var statusItem: NSStatusItem?
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "MenuBarManager")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "MenuBarManager")
     
     /// Whether the menu bar icon is currently shown
     @Published var isMenuBarIconVisible: Bool = false {
@@ -53,9 +53,9 @@ final class MenuBarManager: NSObject, ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "square.stack.3d.up.fill", accessibilityDescription: "PluralMac")
+            button.image = NSImage(systemSymbolName: "square.stack.3d.up.fill", accessibilityDescription: "PluralMac Plus")
             button.image?.isTemplate = true
-            button.toolTip = "PluralMac - Quick Launch"
+            button.toolTip = "PluralMac Plus - Quick Launch"
         }
         
         updateMenu()
@@ -76,7 +76,7 @@ final class MenuBarManager: NSObject, ObservableObject {
         let menu = NSMenu()
         
         // Header
-        let headerItem = NSMenuItem(title: "PluralMac", action: nil, keyEquivalent: "")
+        let headerItem = NSMenuItem(title: "PluralMac Plus", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         menu.addItem(headerItem)
         
@@ -145,7 +145,7 @@ final class MenuBarManager: NSObject, ObservableObject {
         
         // Show main window
         let showWindowItem = NSMenuItem(
-            title: "Show PluralMac",
+            title: "Show PluralMac Plus",
             action: #selector(showMainWindow),
             keyEquivalent: ""
         )
@@ -165,7 +165,7 @@ final class MenuBarManager: NSObject, ObservableObject {
         
         // Quit
         let quitItem = NSMenuItem(
-            title: "Quit PluralMac",
+            title: "Quit PluralMac Plus",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )

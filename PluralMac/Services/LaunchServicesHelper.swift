@@ -15,7 +15,7 @@ struct LaunchServicesHelper: Sendable {
     
     // MARK: - Properties
     
-    private static let logger = Logger(subsystem: "com.mtech.PluralMac", category: "LaunchServices")
+    private static let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "LaunchServices")
     
     // MARK: - Registration
     

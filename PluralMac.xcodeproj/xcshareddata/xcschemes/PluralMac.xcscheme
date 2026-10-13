@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "DFFBD9342F33BAD800B7EA3F"
-               BuildableName = "PluralMac.app"
+               BuildableName = "PluralMac Plus.app"
                BlueprintName = "PluralMac"
                ReferencedContainer = "container:PluralMac.xcodeproj">
             </BuildableReference>
@@ -55,7 +55,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DFFBD9342F33BAD800B7EA3F"
-            BuildableName = "PluralMac.app"
+            BuildableName = "PluralMac Plus.app"
             BlueprintName = "PluralMac"
             ReferencedContainer = "container:PluralMac.xcodeproj">
          </BuildableReference>
@@ -72,7 +72,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DFFBD9342F33BAD800B7EA3F"
-            BuildableName = "PluralMac.app"
+            BuildableName = "PluralMac Plus.app"
             BlueprintName = "PluralMac"
             ReferencedContainer = "container:PluralMac.xcodeproj">
          </BuildableReference>

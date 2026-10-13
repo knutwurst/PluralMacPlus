@@ -149,13 +149,13 @@ struct PluralMacCommands: Commands {
 // MARK: - Notification Names
 
 extension Notification.Name {
-    static let importInstances = Notification.Name("com.mtech.PluralMac.importInstances")
-    static let showCreateInstance = Notification.Name("com.mtech.PluralMac.showCreateInstance")
-    static let exportAllInstances = Notification.Name("com.mtech.PluralMac.exportAllInstances")
-    static let launchSelectedInstance = Notification.Name("com.mtech.PluralMac.launchSelectedInstance")
-    static let revealSelectedInstance = Notification.Name("com.mtech.PluralMac.revealSelectedInstance")
-    static let revealSelectedInstanceData = Notification.Name("com.mtech.PluralMac.revealSelectedInstanceData")
-    static let duplicateSelectedInstance = Notification.Name("com.mtech.PluralMac.duplicateSelectedInstance")
-    static let renameSelectedInstance = Notification.Name("com.mtech.PluralMac.renameSelectedInstance")
-    static let deleteSelectedInstance = Notification.Name("com.mtech.PluralMac.deleteSelectedInstance")
+    static let importInstances = Notification.Name("com.knutwurst.PluralMacPlus.importInstances")
+    static let showCreateInstance = Notification.Name("com.knutwurst.PluralMacPlus.showCreateInstance")
+    static let exportAllInstances = Notification.Name("com.knutwurst.PluralMacPlus.exportAllInstances")
+    static let launchSelectedInstance = Notification.Name("com.knutwurst.PluralMacPlus.launchSelectedInstance")
+    static let revealSelectedInstance = Notification.Name("com.knutwurst.PluralMacPlus.revealSelectedInstance")
+    static let revealSelectedInstanceData = Notification.Name("com.knutwurst.PluralMacPlus.revealSelectedInstanceData")
+    static let duplicateSelectedInstance = Notification.Name("com.knutwurst.PluralMacPlus.duplicateSelectedInstance")
+    static let renameSelectedInstance = Notification.Name("com.knutwurst.PluralMacPlus.renameSelectedInstance")
+    static let deleteSelectedInstance = Notification.Name("com.knutwurst.PluralMacPlus.deleteSelectedInstance")
 }

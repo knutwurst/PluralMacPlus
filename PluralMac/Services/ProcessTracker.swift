@@ -20,7 +20,7 @@ final class ProcessTracker: ObservableObject {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "ProcessTracker")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "ProcessTracker")
     
     /// Map of instance IDs to their running applications
     @Published private(set) var runningInstances: [UUID: NSRunningApplication] = [:]
@@ -221,6 +221,6 @@ final class ProcessTracker: ObservableObject {
 // MARK: - Notification Names
 
 extension Notification.Name {
-    static let instanceDidLaunch = Notification.Name("com.mtech.PluralMac.instanceDidLaunch")
-    static let instanceDidTerminate = Notification.Name("com.mtech.PluralMac.instanceDidTerminate")
+    static let instanceDidLaunch = Notification.Name("com.knutwurst.PluralMacPlus.instanceDidLaunch")
+    static let instanceDidTerminate = Notification.Name("com.knutwurst.PluralMacPlus.instanceDidTerminate")
 }

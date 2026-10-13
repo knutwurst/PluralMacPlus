@@ -17,7 +17,7 @@ actor InstanceStore {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "InstanceStore")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "InstanceStore")
     private let fileManager = FileManager.default
     
     /// URL to the instances JSON file

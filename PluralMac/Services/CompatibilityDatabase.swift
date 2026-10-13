@@ -18,7 +18,7 @@ actor CompatibilityDatabase {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "CompatibilityDatabase")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "CompatibilityDatabase")
     private var entries: [String: CompatibilityEntry] = [:]
     private var isLoaded = false
     

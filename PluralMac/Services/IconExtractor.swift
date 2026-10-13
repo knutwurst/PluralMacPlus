@@ -18,7 +18,7 @@ actor IconExtractor {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "IconExtractor")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "IconExtractor")
     private let fileManager = FileManager.default
     private let cache = IconCache.shared
     

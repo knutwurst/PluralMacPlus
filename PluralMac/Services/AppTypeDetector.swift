@@ -18,7 +18,7 @@ final class AppTypeDetector: Sendable {
     
     // MARK: - Private Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "AppTypeDetector")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "AppTypeDetector")
     
     // MARK: - Known App Identifiers
     

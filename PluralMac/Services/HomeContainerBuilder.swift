@@ -14,7 +14,7 @@ struct HomeContainerBuilder: Sendable {
     
     // MARK: - Properties
     
-    private static let logger = Logger(subsystem: "com.mtech.PluralMac", category: "HomeContainerBuilder")
+    private static let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "HomeContainerBuilder")
     private static let fileManager = FileManager.default
     
     // MARK: - Container Configuration
