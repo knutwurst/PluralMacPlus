@@ -1,365 +1,192 @@
-# PluralMac
+<h1 align="center">PluralMac Plus</h1>
 
 <p align="center">
-  <img src="docs/images/icon.png" alt="PluralMac Icon" width="128" height="128">
+  <img src="docs/images/icon.png" alt="PluralMac Plus icon" width="128" height="128">
 </p>
 
 <p align="center">
-  <strong>Run multiple instances of the same macOS app with isolated data</strong>
+  <strong>Run several copies of the same Mac app side by side, each with its own accounts, settings and cache.</strong>
 </p>
 
 <p align="center">
-  <a href="#showcase">Showcase</a> •
-  <a href="#features">Features</a> •
-  <a href="#supported-apps">Supported Apps</a> •
-  <a href="#installation">Installation</a> •
+  <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-SwiftUI-orange?logo=swift">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
+<p align="center">
+  <a href="#whats-new-in-plus">What's new</a> •
+  <a href="#getting-started">Getting started</a> •
   <a href="#usage">Usage</a> •
-  <a href="#how-it-works">How It Works</a>
+  <a href="#how-it-works">How it works</a> •
+  <a href="#compatibility">Compatibility</a> •
+  <a href="#troubleshooting">Troubleshooting</a>
 </p>
 
 ---
 
-> **PluralMac Plus** is a fork of [Devrax/PluralMac](https://github.com/Devrax/PluralMac) with these additions:
->
-> - **Launcher apps**: create a small app named after the instance (in `/Applications` or anywhere else) that starts the instance directly, from the Dock, Launchpad or Spotlight, without opening PluralMac Plus. It is updated when the instance changes and moved to the Trash when the instance is deleted. The launcher icon color can be changed with a hue slider. The running app keeps its own name and icon in the Dock.
-> - **Choose the data folder when creating an instance**: pick a new folder, or point to a folder with existing data. PluralMac Plus asks whether to continue with that data or choose another folder. Nothing is ever deleted.
-> - **Default data location**: Settings → Storage → Data Directory sets where new instances store their data (default `~/Library/PluralMac/Data`).
-> - **Move Data Folder…** for existing instances, e.g. to an external drive. The instance must not be running.
-> - **Unplugged drive protection**: if an instance's data lives on a volume that is not connected, launching fails with a clear message instead of starting with an empty profile.
-> - **Rename from the sidebar**, blank names are rejected.
-> - **Fixed**: opening Settings crashed the app.
->
-> PluralMac Plus reads the same `~/Library/PluralMac/instances.json` as the original, so existing instances carry over.
->
-> **Building locally:** `scripts/build-release.sh` builds a Release version into `dist/` (`PluralMac Plus.app` plus a zip for distribution). It needs Xcode.
+PluralMac Plus starts the apps you already have with a separate data folder per instance. You keep one installation of the app and get as many independent profiles as you need: a work and a personal account, a test profile, a client setup. The original app stays untouched.
 
-## Overview
+PluralMac Plus is a fork of [PluralMac](https://github.com/Devrax/PluralMac) by Rafael Alexander Mejia Blanco. It reads the same `~/Library/PluralMac/instances.json`, so instances you created with PluralMac carry over.
 
-PluralMac allows you to run multiple independent instances of the same macOS application, each with its own isolated data storage. Perfect for:
+## What's new in Plus
 
-- 🎵 **Multiple Spotify accounts** - Personal and work playlists on separate instances
-- 💬 **Multiple Slack workspaces** - Different accounts running simultaneously  
-- 💻 **Multiple VS Code/Cursor instances** - Per-project isolated environments
-- 🌐 **Multiple browser profiles** - Work/personal separation
+### 🚀 Launcher apps
 
-> ⚠️ **Note**: Not all apps support data isolation. See [Technical Limitations](#technical-limitations) for details on why some apps (like Discord) cannot have separate accounts.
+Give every instance its own app. PluralMac Plus creates a small launcher named after the instance, in `/Applications` or any folder you pick. Start it from the Dock, Launchpad or Spotlight and the instance opens directly, without PluralMac Plus running.
 
-## Showcase
+- **Icon color:** a hue slider with live preview tints the launcher icon, so you can tell your instances apart at a glance.
+- **Stays in sync:** rename the instance or move its data, and PluralMac Plus rebuilds the launcher. Launchers from an older version get updated on the next start.
+- **Safe removal:** deleting an instance or pressing **Remove** moves the launcher to the Trash. PluralMac Plus never overwrites an app it didn't create.
 
-### 1. Initial App View
-<p align="center">
-  <img src="docs/images/initial-app.png" alt="PluralMac Initial View" width="600">
-</p>
+The running app keeps its original name and icon in the Dock. macOS shows the bundle of the running process there, and PluralMac Plus doesn't copy or modify that bundle.
 
-### 2. Creating a New Instance
-<p align="center">
-  <img src="docs/images/creating-instance.png" alt="Creating Instance" width="600">
-</p>
+### 📁 Your data, where you want it
 
-### 3. Selecting an Application (GitHub Desktop)
-<p align="center">
-  <img src="docs/images/creating-instance-ghdesktop.png" alt="Selecting GitHub Desktop" width="600">
-</p>
+- **Pick the data folder when you create an instance.** Choose an empty folder for a fresh profile, or a folder that already holds a profile. PluralMac Plus asks whether you want to continue with the existing data or choose another folder. It never offers to delete anything.
+- **Default location:** Settings → Storage → Data Directory decides where new instances go. Leave it empty for `~/Library/PluralMac/Data`.
+- **Move Data Folder…** relocates an existing instance, for example to an encrypted external drive.
+- **Unplugged drive protection:** if an instance's data lives on a volume that isn't connected, PluralMac Plus refuses to launch it and tells you why. Without that check the app would start with an empty profile.
 
-### 4. Running Multiple Instances
-<p align="center">
-  <img src="docs/images/running-multiple-instaces.png" alt="Multiple Instances Running" width="600">
-</p>
+### 🔒 Stronger isolation
 
-## Features
+The original PluralMac redirected `HOME`. macOS's own path APIs ignore `HOME`, so caches, `Application Support`, `HTTPStorages` and preferences of many apps still landed in your real home folder and got shared between instances. PluralMac Plus also sets `CFFIXED_USER_HOME`, which moves all of those into the instance's data folder.
 
-- ✅ **No app modification** - Original apps remain untouched
-- ✅ **Complete data isolation** - Each instance has its own cache, settings, and login
-- ✅ **Run simultaneously** - Multiple instances can run at the same time
-- ✅ **Simple UI** - Create and manage instances with a few clicks
-- ✅ **App-specific optimizations** - Uses the best isolation method for each app
+### 🪟 Manage running instances
 
-## Supported Apps
+- **Double-click an instance** in the sidebar: PluralMac Plus starts it, or brings it to the front if it's already running and restores a minimized window, like a click on its Dock icon.
+- **Show** in the detail view does the same.
+- **Running status survives restarts.** Quit and reopen PluralMac Plus, and it still recognizes which instances are running, including the ones you started through a launcher.
 
-### ✅ Fully Supported (Tested)
+### 🛠 Fixes
 
-| App | Isolation Method | Notes |
-|-----|------------------|-------|
-| **Spotify** | `--mu` flag | Official multi-instance support |
-| **Google Chrome** | `--user-data-dir` | Full profile isolation |
-| **Microsoft Edge** | `--user-data-dir` | Full profile isolation |
-| **Brave Browser** | `--user-data-dir` | Full profile isolation |
-| **Arc Browser** | `--user-data-dir` | Full profile isolation |
-| **Vivaldi** | `--user-data-dir` | Full profile isolation |
-| **Discord** | `--multi-instance` | ⚠️ Multiple windows only, same account |
-| **Slack** | `--user-data-dir` | Multiple workspaces |
-| **VS Code** | `--user-data-dir` | Per-project environments |
-| **Cursor** | `--user-data-dir` | Per-project environments |
-| **Firefox** | `-profile` | Profile directory isolation |
-| **Waterfox** | `-profile` | Profile directory isolation |
+- Opening Settings crashed the app (in the original 1.0 as well).
+- The menu bar entry of an instance launched nothing. It now starts the instance or brings it to the front.
+- You can rename instances from the sidebar's context menu, and blank names get rejected.
 
-### ⚠️ Partially Supported
-
-| App | Status | Notes |
-|-----|--------|-------|
-| **Electron apps (generic)** | May work | Try `--user-data-dir` |
-| **ToDesktop apps** | May work | Similar to Electron |
-| **Generic apps** | Varies | HOME redirection attempted |
-
-### ❌ Not Supported
-
-| App | Reason |
-|-----|--------|
-| **Mac App Store apps** | Sandboxed - cannot modify data location |
-| **Apple system apps** | Protected by SIP |
-| **Apps with license verification** | May detect multiple instances |
-
-### ⚠️ Limited Support (Multiple Windows Only)
-
-| App | Notes |
-|-----|-------|
-| **Discord** | Can run multiple windows with `--multi-instance`, but ALL share the same account/data. Discord ignores `--user-data-dir` and `HOME` redirection. |
-
-## Installation
+## Getting started
 
 ### Requirements
 
-- macOS 14.0 (Sonoma) or later
-- Target apps must be non-sandboxed
+- macOS 14 Sonoma or later
+- Xcode 26 to build from source
+- The app you want to run more than once must not be sandboxed (most Mac App Store apps are)
 
-### Build from Source
+### Build
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/PluralMac.git
-cd PluralMac
-
-# Open in Xcode
-open PluralMac.xcodeproj
-
-# Build and Run (⌘R)
+git clone https://github.com/knutwurst/PluralMacPlus.git
+cd PluralMacPlus
+scripts/build-release.sh
 ```
 
-### Download Release
+The script builds the Release configuration and puts `PluralMac Plus.app` plus a zip into `dist/`. Move the app to `/Applications`. If `xcode-select` points to the Command Line Tools, the script switches to `/Applications/Xcode.app` by itself.
 
-> Coming soon - check the Releases page for pre-built binaries.
+You can also open `PluralMac.xcodeproj` in Xcode and press ⌘R.
+
+The build is ad-hoc signed and not notarized. On first launch, right-click the app and choose **Open**, or run:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/PluralMac Plus.app"
+```
+
+I'll publish pre-built releases once version 1.1 is finished.
 
 ## Usage
 
-### Creating an Instance
+### Create an instance
 
-1. **Launch PluralMac**
-2. Click the **"+"** button or **"New Instance"**
-3. **Select an application** from your `/Applications` folder
-4. **Name your instance** (e.g., "Spotify Work", "Chrome Personal")
-5. Click **"Create"**
+1. Click **+** and select the app.
+2. Give the instance a name.
+3. Under **Data Folder**, keep the default or choose a folder.
+4. Under **Launcher App**, decide whether you want a launcher, where it goes and which color its icon gets.
+5. Click **Create**.
 
-### Launching an Instance
+On first launch the instance starts with an empty profile, so you sign in like on a new machine.
 
-1. Select an instance from the list
-2. Click **"Launch"** or double-click
+### Everyday use
 
-The app will open with isolated data - you'll need to log in fresh on first launch.
+| Action | Where |
+|---|---|
+| Start or bring to front | Double-click in the sidebar, **Launch** / **Show** in the detail view, or the menu bar |
+| Stop | **Stop** in the detail view, or the stop icon when you hover over an instance |
+| Rename | Right-click → **Rename…** |
+| Move the data folder | Right-click → **Move Data Folder…** (the instance must not be running) |
+| Launcher app | Detail view → **Launcher App**: create, recreate, move, remove, change color |
+| Open the data folder | Right-click → **Show Data Folder** |
+| Duplicate | Right-click → **Duplicate** |
+| Delete | Right-click → **Delete Shortcut** keeps the data, **Delete Shortcut & Data** removes it too |
 
-### Managing Instances
+## How it works
 
-- **Rename**: Right-click → Rename
-- **Delete**: Right-click → Delete (optionally delete data too)
-- **Reveal Data**: Right-click → Show Data in Finder
-- **Duplicate**: Right-click → Duplicate
+PluralMac Plus starts the original app through `NSWorkspace.openApplication` with `createsNewApplicationInstance`, so macOS treats every instance as a separate process. Each instance gets:
 
-## How It Works
+- **Environment:** `HOME` and `CFFIXED_USER_HOME` point to the data folder, plus the `XDG_*` variables for apps that follow them.
+- **App-specific arguments** where an app supports them, such as `--user-data-dir` for Chromium and Electron apps, `-profile` for Firefox and `--mu` for Spotify.
+- **A prepared data folder** with links to your real Desktop, Documents, Downloads, Movies, Music, Pictures, Public and Keychains, so file dialogs and saved passwords keep working.
 
-PluralMac uses different isolation strategies depending on the application:
+A **launcher app** is a tiny bundle with an `Info.plist`, an icon and a shell script that calls `open -n -a <app> --env … --args …`, the same launch PluralMac Plus performs.
 
-### 1. App-Specific Arguments
+To **recognize running instances**, PluralMac Plus reads the `HOME` variable of running processes of the target app and matches it against the instance data folders.
 
-Many apps support command-line arguments for data isolation:
-
-```bash
-# Spotify
-Spotify --mu=instance-uuid
-
-# Chromium-based browsers
-Chrome --user-data-dir=/path/to/data
-
-# Firefox-based browsers
-Firefox -profile /path/to/profile
-
-# Discord
-Discord --multi-instance --user-data-dir=/path/to/data
-```
-
-### 2. NSWorkspace Launch
-
-PluralMac uses `NSWorkspace.openApplication()` with:
-- Custom environment variables
-- Command-line arguments
-- `createsNewApplicationInstance = true`
-
-This launches apps properly through macOS while passing isolation parameters.
-
-### Data Storage
-
-Instance data is stored in:
 ```
 ~/Library/PluralMac/
-├── Data/
-│   ├── <instance-uuid-1>/    # Isolated data for instance 1
-│   ├── <instance-uuid-2>/    # Isolated data for instance 2
-│   └── ...
-└── instances.json            # Instance configurations
+├── instances.json        # instance configuration
+└── Data/                 # default location for instance data
+    └── <instance-id>/
+        ├── Library/
+        │   ├── Application Support/
+        │   ├── Caches/
+        │   ├── HTTPStorages/
+        │   └── Preferences/
+        └── Desktop -> ~/Desktop, Documents -> ~/Documents, …
 ```
 
-## Architecture
+## Compatibility
 
-```
-PluralMac/
-├── App/                    # App entry point
-├── Models/
-│   ├── AppInstance.swift   # Instance configuration model
-│   ├── Application.swift   # Detected application model
-│   └── AppType.swift       # App type detection & isolation methods
-├── ViewModels/
-│   └── InstanceViewModel.swift  # Main view model
-├── Views/
-│   ├── Main/               # Main window views
-│   ├── Creation/           # Instance creation wizard
-│   └── Settings/           # Settings views
-├── Services/
-│   ├── DirectLauncher.swift     # NSWorkspace-based launcher
-│   ├── AppDetector.swift        # App type detection
-│   └── InstanceStore.swift      # Persistence
-└── Utilities/
-```
+| App | Method | Notes |
+|---|---|---|
+| Google Chrome, Microsoft Edge, Brave, Arc, Vivaldi | `--user-data-dir` | Full profile isolation |
+| VS Code, Cursor | `--user-data-dir` | Separate settings and extensions |
+| Slack | `--user-data-dir` | Separate workspaces |
+| Firefox, Waterfox | `-profile` | Separate profiles |
+| Spotify | `--mu` | Official multi-instance support |
+| Flutter and native macOS apps | `HOME` + `CFFIXED_USER_HOME` | Works when the app stores its data in the usual Library folders |
+| Discord | `--multi-instance` | Several windows, but one shared account |
+
+PluralMac Plus can't isolate:
+
+- **Sandboxed apps**, including most Mac App Store apps. macOS gives them a fixed container.
+- **Apple system apps.** System Integrity Protection guards them.
+- **Apps with hardcoded data paths** that ignore both arguments and environment.
+
+A few things stay shared between instances: the Keychain, the per-user temporary folder (`/var/folders/…/T`) and macOS's shader caches.
 
 ## Troubleshooting
 
-### App opens with original data
+**The instance shows the data of the original app.** The app ignores the isolation methods above. Check the compatibility table. Editing custom arguments and environment variables in the UI isn't implemented yet; you can add them to the instance in `~/Library/PluralMac/instances.json` while PluralMac Plus is closed.
 
-**Cause**: The app doesn't support the isolation method being used.
+**"The data folder is on … which is not connected."** The instance's data lives on an external or encrypted volume that isn't mounted. Connect or unlock it and launch again.
 
-**Solution**: 
-1. Check if the app is in the "Supported Apps" list
-2. Try adding custom command-line arguments in instance settings
-3. Some apps may require different flags
+**An external drive with exFAT.** exFAT has no journaling. Quit your instances before you eject the drive, otherwise their databases can get damaged.
 
-### App won't launch
+**The app won't launch.** Make sure the original app still sits at the path shown in the detail view. Console.app lists errors under the subsystem `com.knutwurst.PluralMacPlus`.
 
-**Cause**: Missing permissions or invalid app path.
+**"App is damaged" or "can't be opened".** Gatekeeper blocks the ad-hoc signed build. See the `xattr` command under [Build](#build).
 
-**Solution**:
-1. Ensure PluralMac has Full Disk Access (System Settings → Privacy & Security)
-2. Verify the original app still exists at the expected path
-3. Check Console.app for error messages
+## Development
 
-### Multiple instances show same data
-
-**Cause**: App uses system keychain or shared preferences.
-
-**Solution**: Some data (like login tokens in Keychain) may be shared. You may need to:
-1. Log out of the original app first
-2. Use the isolated instance to log in with a different account
-
-### "App is damaged" error
-
-**Cause**: macOS Gatekeeper blocking unsigned apps.
-
-**Solution**:
 ```bash
-xattr -cr /path/to/app.app
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild -project PluralMac.xcodeproj -scheme PluralMac test
 ```
 
-## Contributing
+The `PluralMacTests` target covers data locations, moving data folders, launcher generation, icon tinting, process discovery and window activation.
 
-Contributions are welcome! Please:
+To add support for another app, extend the app type detection in `Services/AppTypeDetector.swift` and the arguments in `AppInstance.effectiveCommandLineArguments`.
 
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
+## Credits and license
 
-### Adding Support for New Apps
+PluralMac Plus builds on [PluralMac](https://github.com/Devrax/PluralMac) by Rafael Alexander Mejia Blanco. Maintained by [Knutwurst](https://github.com/knutwurst).
 
-To add support for a new application:
-
-1. **Detect the app type** in `AppDetector.swift`
-2. **Add isolation arguments** in `AppInstance.effectiveCommandLineArguments`
-3. **Test thoroughly** with multiple instances
-4. **Update this README** with the new app
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Technical Limitations
-
-### Why Some Apps Cannot Be Isolated
-
-Some applications (like Discord, WhatsApp Desktop, and others) **cannot have their data isolated** on macOS, even with PluralMac. This is a fundamental limitation of macOS, not a bug in PluralMac ( also I lack the current skills and knowledge to work around these limitations ).
-
-#### The Problem
-
-These apps **hardcode their data paths** directly in the binary:
-
-```javascript
-// Discord's internal code (simplified)
-const dataPath = path.join(os.homedir(), 'Library/Application Support/discord');
-// This path is NOT configurable via arguments or environment variables
-```
-
-#### Why Our Isolation Methods Fail
-
-| Technique | Result | Why It Fails |
-|-----------|--------|--------------|
-| `--user-data-dir` argument | ❌ Ignored | Discord doesn't implement this Electron flag |
-| `HOME` environment variable | ❌ Ignored | Discord uses `os.homedir()` which reads from system, not env |
-| `sandbox-exec` | ❌ Can only block | macOS sandbox can deny access, but cannot redirect paths |
-| `DYLD_INSERT_LIBRARIES` | ❌ Blocked | Discord has Hardened Runtime enabled (`flags=0x10000`) |
-| Symlink swapping | ❌ Dangerous | Would affect ALL running instances simultaneously |
-| Filesystem namespaces | ❌ Not available | macOS doesn't have Linux-style mount namespaces |
-
-#### The Concurrency Problem with Symlinks
-
-Even if we tried symlink swapping, it would fail catastrophically:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Timeline of Disaster:                                      │
-│                                                             │
-│  1. Discord Instance A is running                           │
-│     → Uses ~/Library/Application Support/discord            │
-│                                                             │
-│  2. User launches Instance B                                │
-│     → PluralMac swaps symlink to point to instance-B data   │
-│                                                             │
-│  3. Instance A tries to write to its database               │
-│     → Files have "disappeared" → CRASH or DATA CORRUPTION   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### Apps That Work vs Apps That Don't
-
-| App | Works? | Reason |
-|-----|--------|--------|
-| **Spotify** | ✅ | Implements `--mu` flag for official multi-instance |
-| **Chrome/Edge/Brave** | ✅ | Implements `--user-data-dir` flag |
-| **VS Code/Cursor** | ✅ | Implements `--user-data-dir` flag |
-| **Firefox** | ✅ | Implements `-profile` flag |
-| **Discord** | ❌ | Ignores all isolation methods |
-| **WhatsApp Desktop** | ❌ | Hardcoded paths, no isolation support |
-| **Telegram Desktop** | ⚠️ | May work with `-many` flag (untested) |
-
-#### The Only Real Solutions
-
-For apps that don't support isolation, the only options are:
-
-1. **Different macOS user accounts** - Each user has separate `~/Library` (heavy, impractical)
-2. **Virtual machines** - Run the app in separate VMs (very heavy)
-3. **Wait for developer support** - Request the app developer add multi-instance support
-4. **Web version** - Use the web app in different browser profiles
-5. **Wait for me to learn advanced macOS internals** - Maybe in the future I'll find a workaround!
-
-## Acknowledgments
-
-- Built with SwiftUI and modern macOS APIs
-
----
-
-<p align="center">
-  Made with ❤️ for macOS power users
-</p>
+MIT License. See [LICENSE](LICENSE).
