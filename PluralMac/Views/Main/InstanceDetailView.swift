@@ -323,6 +323,12 @@ struct InstanceDetailView: View {
                     Button("Move...") {
                         createLauncher(startingAt: launcher.deletingLastPathComponent())
                     }
+                    Button("Remove", role: .destructive) {
+                        Task {
+                            await viewModel.removeLauncher(for: instance)
+                        }
+                    }
+                    .help("Moves the launcher app to the Trash")
                 }
             } else {
                 Text("A small app named \"\(instance.name)\" that starts this instance directly, e.g. from the Dock, Launchpad or Spotlight.")

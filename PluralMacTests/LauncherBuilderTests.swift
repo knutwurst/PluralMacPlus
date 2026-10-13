@@ -88,3 +88,36 @@ final class LauncherBuilderTests: XCTestCase {
         XCTAssertFalse(LauncherBuilder.isLauncher(at: launcher, for: UUID()))
     }
 }
+
+final class LauncherRemovalTests: XCTestCase {
+
+    func testRemoveMovesOwnLauncherAway() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let instance = AppInstance(name: "Work Profile", application: makeTestApplication())
+        let launcher = try LauncherBuilder().build(for: instance, in: folder)
+        var trashed: [URL] = []
+
+        try LauncherBuilder.remove(launcher, for: instance.id) { trashed.append($0) }
+
+        XCTAssertEqual(trashed, [launcher])
+    }
+
+    func testRemoveRefusesForeignApp() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let foreign = folder.appendingPathComponent("Other.app/Contents")
+        try FileManager.default.createDirectory(at: foreign, withIntermediateDirectories: true)
+        var trashed: [URL] = []
+
+        XCTAssertThrowsError(try LauncherBuilder.remove(foreign.deletingLastPathComponent(), for: UUID()) { trashed.append($0) })
+        XCTAssertTrue(trashed.isEmpty)
+    }
+
+    func testRemoveOfMissingLauncherIsNoOp() throws {
+        let missing = URL(fileURLWithPath: "/tmp/does-not-exist-\(UUID().uuidString).app")
+        var trashed: [URL] = []
+
+        try LauncherBuilder.remove(missing, for: UUID()) { trashed.append($0) }
+
+        XCTAssertTrue(trashed.isEmpty)
+    }
+}

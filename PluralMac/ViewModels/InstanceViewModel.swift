@@ -254,6 +254,21 @@ final class InstanceViewModel {
         }
     }
     
+    /// Move the launcher app to the Trash and forget it. Errors are shown in the error alert.
+    func removeLauncher(for instance: AppInstance) async {
+        guard let launcher = instance.launcherPath else { return }
+        
+        do {
+            try LauncherBuilder.remove(launcher, for: instance.id)
+            var updated = instances.first { $0.id == instance.id } ?? instance
+            updated.launcherPath = nil
+            try await persist(updated)
+            logger.info("Removed launcher of \(instance.name)")
+        } catch {
+            handleError(error, context: "removing launcher app")
+        }
+    }
+    
     /// Reveal the launcher app in Finder
     func revealLauncherInFinder(_ instance: AppInstance) {
         if let launcher = instance.launcherPath {

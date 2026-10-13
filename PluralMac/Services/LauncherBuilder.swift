@@ -24,11 +24,14 @@ struct LauncherBuilder {
 
     enum LauncherError: LocalizedError, Equatable {
         case appAlreadyExists(URL)
+        case notALauncher(URL)
 
         var errorDescription: String? {
             switch self {
             case .appAlreadyExists(let url):
                 return "\"\(url.lastPathComponent)\" already exists in \(url.deletingLastPathComponent().path) and is not a launcher of this instance."
+            case .notALauncher(let url):
+                return "\"\(url.lastPathComponent)\" is not a launcher of this instance and was left untouched."
             }
         }
     }
@@ -119,6 +122,19 @@ struct LauncherBuilder {
         let executable = bundle.appendingPathComponent("Contents/MacOS/\(Self.executableName)")
         guard let current = try? String(contentsOf: executable, encoding: .utf8) else { return false }
         return current == script(for: instance)
+    }
+
+    /// Moves the launcher of `instanceID` to the Trash. A missing launcher is ignored; any other app is refused.
+    static func remove(
+        _ bundle: URL,
+        for instanceID: UUID,
+        trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    ) throws {
+        guard FileManager.default.fileExists(atPath: bundle.path) else { return }
+        guard isLauncher(at: bundle, for: instanceID) else {
+            throw LauncherError.notALauncher(bundle)
+        }
+        try trash(bundle)
     }
 
     /// Whether `bundle` is a launcher created for the instance with `instanceID`
