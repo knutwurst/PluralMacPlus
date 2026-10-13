@@ -19,7 +19,7 @@ actor ImportExportManager {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "ImportExportManager")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "ImportExportManager")
     private let fileManager = FileManager.default
     
     // MARK: - Export Data Model
@@ -239,6 +239,6 @@ enum ImportExportError: LocalizedError {
 extension UTType {
     /// PluralMac instance export file type
     static var pluralMacExport: UTType {
-        UTType(exportedAs: "com.mtech.pluralmac.export", conformingTo: .json)
+        UTType(exportedAs: "com.knutwurst.pluralmacplus.export", conformingTo: .json)
     }
 }

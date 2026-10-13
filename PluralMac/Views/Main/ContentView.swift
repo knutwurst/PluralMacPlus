@@ -128,7 +128,7 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
                 if let instance = viewModel.selectedInstance {
-                    Task { try? await viewModel.renameInstance(instance, to: renameName) }
+                    Task { await viewModel.renameInstance(instance, to: renameName) }
                 }
             }
         }
@@ -163,7 +163,7 @@ struct ContentView: View {
     private func exportAllInstances() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "PluralMac-Backup.json"
+        panel.nameFieldStringValue = "PluralMacPlus-Backup.json"
         panel.title = "Export All Instances"
         
         if panel.runModal() == .OK, let url = panel.url {

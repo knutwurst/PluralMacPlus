@@ -32,6 +32,9 @@ struct CreateInstanceView: View {
     @State private var customIconPath: URL?
     @State private var selectedIcon: NSImage?
     
+    // Data folder (nil = default from Settings)
+    @State private var customDataPath: URL?
+    
     // MARK: - Body
     
     var body: some View {
@@ -43,6 +46,7 @@ struct CreateInstanceView: View {
                 // Instance Name Section
                 if detectedApp != nil {
                     instanceNameSection
+                    dataFolderSection
                 }
                 
                 // App Info Section
@@ -141,6 +145,50 @@ struct CreateInstanceView: View {
             Text("Instance Name")
         } footer: {
             Text("Give your instance a unique name to identify it.")
+        }
+    }
+    
+    // MARK: - Data Folder Section
+    
+    private var dataFolderSection: some View {
+        Section {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let path = customDataPath {
+                        Text(path.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if folderHasContents(path) {
+                            Text("Existing data in this folder will be used.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("Default")
+                        Text(DataLocation.baseDirectory().path + "/…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                
+                Spacer()
+                
+                if customDataPath != nil {
+                    Button("Use Default") {
+                        customDataPath = nil
+                    }
+                }
+                
+                Button("Choose...") {
+                    chooseDataFolder()
+                }
+            }
+        } header: {
+            Text("Data Folder")
+        } footer: {
+            Text("Where this instance stores its profile, cache and login. Choose a folder that already contains data to reuse it.")
         }
     }
     
@@ -309,6 +357,26 @@ struct CreateInstanceView: View {
         }
     }
     
+    private func chooseDataFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = customDataPath ?? DataLocation.baseDirectory()
+        panel.prompt = "Use Folder"
+        panel.message = "Choose the data folder for this instance. Create a new folder or select one that already contains data."
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            customDataPath = url
+        }
+    }
+    
+    private func folderHasContents(_ url: URL) -> Bool {
+        let contents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+        return contents.contains { $0 != ".DS_Store" }
+    }
+    
     private func validateApp(at url: URL) {
         isValidating = true
         validationError = nil
@@ -342,7 +410,8 @@ struct CreateInstanceView: View {
                 application: app,
                 environmentVariables: environmentVariables,
                 arguments: commandLineArguments,
-                customIconPath: customIconPath
+                customIconPath: customIconPath,
+                dataPath: customDataPath
             )
             dismiss()
         } catch {

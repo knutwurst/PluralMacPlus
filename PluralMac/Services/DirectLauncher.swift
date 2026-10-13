@@ -23,7 +23,7 @@ actor DirectLauncher {
     
     // MARK: - Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "DirectLauncher")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "DirectLauncher")
     private let fileManager = FileManager.default
     
     // MARK: - Initialization
@@ -182,6 +182,11 @@ actor DirectLauncher {
     
     /// Ensure the data directory exists with proper structure
     private func ensureDataDirectoryExists(dataPath: URL) async throws {
+        // Don't silently start with an empty profile when the data lives on an unplugged drive
+        if let volume = DataLocation.unmountedVolume(for: dataPath) {
+            throw DirectLaunchError.dataVolumeUnavailable(volume)
+        }
+        
         // Create data directory if it doesn't exist
         if !fileManager.fileExists(atPath: dataPath.path) {
             try fileManager.createDirectory(
@@ -249,6 +254,7 @@ enum DirectLaunchError: LocalizedError {
     case invalidBundle(URL)
     case launchFailed(String)
     case alreadyRunning(UUID)
+    case dataVolumeUnavailable(URL)
     
     var errorDescription: String? {
         switch self {
@@ -260,6 +266,8 @@ enum DirectLaunchError: LocalizedError {
             return "Failed to launch: \(message)"
         case .alreadyRunning(let id):
             return "Instance \(id.uuidString) is already running"
+        case .dataVolumeUnavailable(let volume):
+            return "The data folder is on \(volume.lastPathComponent), which is not connected. Connect the drive and try again."
         }
     }
 }
@@ -267,6 +275,6 @@ enum DirectLaunchError: LocalizedError {
 // MARK: - Notifications
 
 extension Notification.Name {
-    static let instanceTerminated = Notification.Name("com.mtech.pluralmac.instanceTerminated")
-    static let instanceLaunched = Notification.Name("com.mtech.pluralmac.instanceLaunched")
+    static let instanceTerminated = Notification.Name("com.knutwurst.pluralmacplus.instanceTerminated")
+    static let instanceLaunched = Notification.Name("com.knutwurst.pluralmacplus.instanceLaunched")
 }

@@ -34,7 +34,8 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     var shortcutPath: URL
     
     /// Path to the isolated data directory for this instance
-    /// `~/Library/PluralMac/Data/{id}/`
+    /// `<Data Directory setting>/{id}/` by default (`~/Library/PluralMac/Data/{id}/`),
+    /// can be moved elsewhere afterwards
     var dataPath: URL
     
     /// Custom environment variables for this instance
@@ -74,10 +75,14 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     ///   - name: Display name for the instance
     ///   - application: The target application to create an instance of
     ///   - baseDirectory: Base directory for PluralMac data (default: ~/Library/PluralMac)
+    ///   - dataDirectory: Parent directory for the instance data folder (default: Data Directory setting)
+    ///   - dataPath: Explicit data folder; overrides `dataDirectory` (an existing folder is reused as-is)
     init(
         name: String,
         application: Application,
-        baseDirectory: URL = Self.defaultBaseDirectory
+        baseDirectory: URL = Self.defaultBaseDirectory,
+        dataDirectory: URL = DataLocation.baseDirectory(),
+        dataPath: URL? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -91,8 +96,7 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
             .appendingPathComponent("Instances")
             .appendingPathComponent("\(sanitizedName).app")
         
-        self.dataPath = baseDirectory
-            .appendingPathComponent("Data")
+        self.dataPath = dataPath ?? dataDirectory
             .appendingPathComponent(id.uuidString)
         
         // Defaults
@@ -184,7 +188,7 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     }
     
     /// Default base directory for PluralMac data
-    static var defaultBaseDirectory: URL {
+    nonisolated static var defaultBaseDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
             .appendingPathComponent("PluralMac")
@@ -241,8 +245,20 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     
     // MARK: - Private Helpers
     
+    /// The instance in `instances` whose data folder is `dataPath`, if any
+    static func instance(usingDataPath dataPath: URL, in instances: [AppInstance]) -> AppInstance? {
+        let path = dataPath.standardizedFileURL.path
+        return instances.first { $0.dataPath.standardizedFileURL.path == path }
+    }
+    
+    /// Trimmed instance name, or nil if it is blank
+    static func validatedName(_ name: String) -> String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+    
     /// Sanitize a string to be used as a file name
-    private static func sanitizeFileName(_ name: String) -> String {
+    nonisolated static func sanitizeFileName(_ name: String) -> String {
         // Remove/replace characters that are problematic in file names
         let invalidCharacters = CharacterSet(charactersIn: ":/\\?%*|\"<>")
         let sanitized = name

@@ -73,7 +73,25 @@ struct InstanceListView: View {
                 Label("Show Data Folder", systemImage: "folder.badge.gearshape")
             }
             
+            Button {
+                if let parent = DataFolderPicker.chooseParent(for: instance) {
+                    Task {
+                        await viewModel.moveDataFolder(instance, toParent: parent)
+                    }
+                }
+            } label: {
+                Label("Move Data Folder...", systemImage: "externaldrive")
+            }
+            .disabled(RunningInstancesManager.shared.isRunning(instance.id) || viewModel.instancesMovingData.contains(instance.id))
+            
             Divider()
+            
+            Button {
+                viewModel.select(instance)
+                NotificationCenter.default.post(name: .renameSelectedInstance, object: nil)
+            } label: {
+                Label("Rename...", systemImage: "pencil")
+            }
             
             Button {
                 Task {

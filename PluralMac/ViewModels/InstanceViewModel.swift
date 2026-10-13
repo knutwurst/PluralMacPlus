@@ -35,9 +35,12 @@ final class InstanceViewModel {
     /// Whether to show error alert
     var showError: Bool = false
     
+    /// Instances whose data folder is currently being moved
+    var instancesMovingData: Set<UUID> = []
+    
     // MARK: - Private Properties
     
-    private let logger = Logger(subsystem: "com.mtech.PluralMac", category: "InstanceViewModel")
+    private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "InstanceViewModel")
     private let store = InstanceStore.shared
     private let directLauncher = DirectLauncher.shared
     
@@ -98,6 +101,7 @@ final class InstanceViewModel {
     ///   - environmentVariables: Custom environment variables
     ///   - arguments: Custom command-line arguments
     ///   - customIconPath: Optional custom icon
+    ///   - dataPath: Optional data folder (nil = Data Directory setting)
     /// - Returns: The created instance
     @discardableResult
     func createInstance(
@@ -105,12 +109,17 @@ final class InstanceViewModel {
         application: Application,
         environmentVariables: [String: String] = [:],
         arguments: [String] = [],
-        customIconPath: URL? = nil
+        customIconPath: URL? = nil,
+        dataPath: URL? = nil
     ) async throws -> AppInstance {
         logger.info("Creating instance: \(name) for \(application.name)")
         
+        if let dataPath, let owner = AppInstance.instance(usingDataPath: dataPath, in: instances) {
+            throw InstanceActionError.dataPathInUse(owner.name)
+        }
+        
         // Create the instance model
-        var instance = AppInstance(name: name, application: application)
+        var instance = AppInstance(name: name, application: application, dataPath: dataPath)
         instance.environmentVariables = environmentVariables
         instance.commandLineArguments = arguments
         instance.customIconPath = customIconPath
@@ -148,19 +157,47 @@ final class InstanceViewModel {
         logger.info("Successfully updated instance: \(instance.name)")
     }
     
-    /// Rename an instance
-    func renameInstance(_ instance: AppInstance, to newName: String) async throws {
+    /// Rename an instance. Blank names are ignored; errors are shown in the error alert.
+    func renameInstance(_ instance: AppInstance, to newName: String) async {
+        guard let name = AppInstance.validatedName(newName), name != instance.name else { return }
+        
         var updated = instance
-        updated.rename(to: newName)
+        updated.rename(to: name)
         
-        try await store.updateInstance(updated)
-        
-        if let index = instances.firstIndex(where: { $0.id == instance.id }) {
-            instances[index] = updated
+        do {
+            try await updateInstance(updated)
+        } catch {
+            handleError(error, context: "renaming instance")
         }
+    }
+    
+    // MARK: - Data Folder
+    
+    /// Move the instance's data folder into `parent`. Errors are shown in the error alert.
+    func moveDataFolder(_ instance: AppInstance, toParent parent: URL) async {
+        logger.info("Moving data folder of \(instance.name) to \(parent.path)")
         
-        if selectedInstance?.id == instance.id {
-            selectedInstance = updated
+        instancesMovingData.insert(instance.id)
+        defer { instancesMovingData.remove(instance.id) }
+        
+        let source = instance.dataPath
+        let folderName = instance.name
+        let isRunning = await directLauncher.isRunning(instance.id)
+        
+        do {
+            // Run off the main actor: moving across volumes copies the whole folder
+            let destination = try await Task.detached {
+                try DataFolderMover().move(from: source, toParent: parent, folderName: folderName, instanceIsRunning: isRunning)
+            }.value
+            
+            var updated = instance
+            updated.dataPath = destination
+            updated.touch()
+            try await updateInstance(updated)
+            
+            logger.info("Moved data folder of \(instance.name) to \(destination.path)")
+        } catch {
+            handleError(error, context: "moving data folder")
         }
     }
     
@@ -384,6 +421,19 @@ extension InstanceViewModel {
     func selectFirstIfNeeded() {
         if selectedInstance == nil, let first = filteredInstances.first {
             selectedInstance = first
+        }
+    }
+}
+
+// MARK: - Errors
+
+enum InstanceActionError: LocalizedError {
+    case dataPathInUse(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .dataPathInUse(let name):
+            return "This data folder is already used by \"\(name)\". Choose a different folder."
         }
     }
 }

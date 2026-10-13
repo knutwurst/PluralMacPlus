@@ -33,6 +33,11 @@ struct InstanceDetailView: View {
         runningManager.isRunning(instance.id)
     }
     
+    /// Whether the data folder is currently being moved
+    private var isMovingData: Bool {
+        viewModel.instancesMovingData.contains(instance.id)
+    }
+    
     // MARK: - Body
     
     var body: some View {
@@ -80,7 +85,7 @@ struct InstanceDetailView: View {
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
                 Task {
-                    try? await viewModel.renameInstance(instance, to: newName)
+                    await viewModel.renameInstance(instance, to: newName)
                 }
             }
         }
@@ -243,7 +248,29 @@ struct InstanceDetailView: View {
                     Button("Show in Finder") {
                         viewModel.revealDataInFinder(instance)
                     }
+                    Button("Move Data Folder...") {
+                        moveDataFolder()
+                    }
+                    .disabled(isRunning || isMovingData)
                 }
+            HStack(spacing: 8) {
+                Button("Move Data Folder...") {
+                    moveDataFolder()
+                }
+                .disabled(isRunning || isMovingData)
+                
+                if isMovingData {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Moving data...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if isRunning {
+                    Text("Quit the instance to move its data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             DetailRow(label: "Shortcut Path", value: instance.shortcutPath.path)
                 .contextMenu {
                     Button("Copy Path") {
@@ -334,6 +361,13 @@ struct InstanceDetailView: View {
                     Label("Duplicate...", systemImage: "plus.square.on.square")
                 }
                 
+                Button {
+                    moveDataFolder()
+                } label: {
+                    Label("Move Data Folder...", systemImage: "externaldrive")
+                }
+                .disabled(isRunning || isMovingData)
+                
                 Divider()
                 
                 Button {
@@ -356,6 +390,13 @@ struct InstanceDetailView: View {
     }
     
     // MARK: - Actions
+    
+    private func moveDataFolder() {
+        guard let parent = DataFolderPicker.chooseParent(for: instance) else { return }
+        Task {
+            await viewModel.moveDataFolder(instance, toParent: parent)
+        }
+    }
     
     private func exportInstance() {
         let panel = NSSavePanel()
