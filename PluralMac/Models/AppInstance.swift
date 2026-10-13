@@ -48,6 +48,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Path to custom icon (nil = use original app icon)
     var customIconPath: URL?
     
+    /// Launcher app created for this instance (nil = none)
+    var launcherPath: URL?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -104,6 +107,7 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         self.environmentVariables = [:]
         self.commandLineArguments = []
         self.customIconPath = nil
+        self.launcherPath = nil
         self.isolationMethodOverride = nil
         self.eraseDataOnQuit = false
         self.showMenuBarIcon = false
@@ -286,6 +290,7 @@ extension AppInstance {
         case environmentVariables
         case commandLineArguments
         case customIconPath
+        case launcherPath
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon

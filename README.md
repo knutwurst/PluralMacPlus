@@ -21,7 +21,8 @@
 
 > **PluralMac Plus** is a fork of [Devrax/PluralMac](https://github.com/Devrax/PluralMac) with these additions:
 >
-> - **Choose the data folder when creating an instance**: pick a new folder or one that already holds an app's data to reuse it.
+> - **Launcher apps**: create a small app named after the instance (in `/Applications` or anywhere else) that starts the instance directly, from the Dock, Launchpad or Spotlight, without opening PluralMac Plus. It is updated when the instance changes and moved to the Trash when the instance is deleted.
+> - **Choose the data folder when creating an instance**: pick a new folder, or point to a folder with existing data. PluralMac Plus asks whether to continue with that data or choose another folder. Nothing is ever deleted.
 > - **Default data location**: Settings → Storage → Data Directory sets where new instances store their data (default `~/Library/PluralMac/Data`).
 > - **Move Data Folder…** for existing instances, e.g. to an external drive. The instance must not be running.
 > - **Unplugged drive protection**: if an instance's data lives on a volume that is not connected, launching fails with a clear message instead of starting with an empty profile.
@@ -29,6 +30,8 @@
 > - **Fixed**: opening Settings crashed the app.
 >
 > PluralMac Plus reads the same `~/Library/PluralMac/instances.json` as the original, so existing instances carry over.
+>
+> **Building locally:** `scripts/build-release.sh` builds a Release version into `dist/` (`PluralMac Plus.app` plus a zip for distribution). It needs Xcode.
 
 ## Overview
 

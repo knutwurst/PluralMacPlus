@@ -35,6 +35,14 @@ struct CreateInstanceView: View {
     
     // Data folder (nil = default from Settings)
     @State private var customDataPath: URL?
+    @State private var folderWithExistingData: URL?
+    @State private var showReuseDialog = false
+    @State private var dataFolderOwner: String?
+    @State private var showFolderInUseAlert = false
+    
+    // Launcher app
+    @State private var createLauncher = true
+    @State private var launcherFolder = LauncherFolderPicker.applicationsFolder
     
     // MARK: - Body
     
@@ -48,6 +56,7 @@ struct CreateInstanceView: View {
                 if detectedApp != nil {
                     instanceNameSection
                     dataFolderSection
+                    launcherSection
                 }
                 
                 // App Info Section
@@ -63,6 +72,31 @@ struct CreateInstanceView: View {
             .formStyle(.grouped)
             .frame(minWidth: 500, minHeight: 400)
             .navigationTitle("Create Instance")
+            .confirmationDialog(
+                "This folder already contains data",
+                isPresented: $showReuseDialog,
+                titleVisibility: .visible,
+                presenting: folderWithExistingData
+            ) { folder in
+                Button("Use Existing Data") {
+                    customDataPath = folder
+                }
+                Button("Choose Another Folder...") {
+                    // Let the dialog close before opening the panel
+                    DispatchQueue.main.async { chooseDataFolder() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { folder in
+                Text("\(folder.path)\n\nThe new instance can continue with this data, e.g. a profile from an earlier instance. Or choose another folder to start fresh. Nothing will be deleted.")
+            }
+            .alert("Folder already in use", isPresented: $showFolderInUseAlert) {
+                Button("Choose Another Folder...") {
+                    DispatchQueue.main.async { chooseDataFolder() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("\"\(dataFolderOwner ?? "")\" already uses this folder. Two instances cannot share a data folder.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -190,6 +224,33 @@ struct CreateInstanceView: View {
             Text("Data Folder")
         } footer: {
             Text("Where this instance stores its profile, cache and login. Choose a folder that already contains data to reuse it.")
+        }
+    }
+    
+    // MARK: - Launcher Section
+    
+    private var launcherSection: some View {
+        Section {
+            Toggle("Create launcher app", isOn: $createLauncher)
+            
+            if createLauncher {
+                HStack {
+                    Text(launcherFolder.path)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button("Choose...") {
+                        let name = instanceName.trimmingCharacters(in: .whitespaces)
+                        if let folder = LauncherFolderPicker.choose(for: name, startingAt: launcherFolder) {
+                            launcherFolder = folder
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Launcher App")
+        } footer: {
+            Text("A small app with the instance name that starts this instance directly, e.g. from the Dock, Launchpad or Spotlight.")
         }
     }
     
@@ -368,7 +429,15 @@ struct CreateInstanceView: View {
         panel.prompt = "Use Folder"
         panel.message = "Choose the data folder for this instance. Create a new folder or select one that already contains data."
         
-        if panel.runModal() == .OK, let url = panel.url {
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        
+        if let owner = AppInstance.instance(usingDataPath: url, in: viewModel.instances) {
+            dataFolderOwner = owner.name
+            showFolderInUseAlert = true
+        } else if folderHasContents(url) {
+            folderWithExistingData = url
+            showReuseDialog = true
+        } else {
             customDataPath = url
         }
     }
@@ -412,7 +481,8 @@ struct CreateInstanceView: View {
                 environmentVariables: environmentVariables,
                 arguments: commandLineArguments,
                 customIconPath: customIconPath,
-                dataPath: customDataPath
+                dataPath: customDataPath,
+                launcherFolder: createLauncher ? launcherFolder : nil
             )
             dismiss()
         } catch {

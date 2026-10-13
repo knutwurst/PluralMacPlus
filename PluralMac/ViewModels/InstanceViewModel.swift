@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AppKit
 import SwiftUI
 import OSLog
 
@@ -103,6 +104,7 @@ final class InstanceViewModel {
     ///   - arguments: Custom command-line arguments
     ///   - customIconPath: Optional custom icon
     ///   - dataPath: Optional data folder (nil = Data Directory setting)
+    ///   - launcherFolder: Folder for a launcher app (nil = no launcher)
     /// - Returns: The created instance
     @discardableResult
     func createInstance(
@@ -111,7 +113,8 @@ final class InstanceViewModel {
         environmentVariables: [String: String] = [:],
         arguments: [String] = [],
         customIconPath: URL? = nil,
-        dataPath: URL? = nil
+        dataPath: URL? = nil,
+        launcherFolder: URL? = nil
     ) async throws -> AppInstance {
         logger.info("Creating instance: \(name) for \(application.name)")
         
@@ -132,8 +135,12 @@ final class InstanceViewModel {
         // Update local list
         instances.append(instance)
         
+        if let launcherFolder {
+            await createLauncher(for: instance, in: launcherFolder)
+        }
+        
         logger.info("Successfully created instance: \(name)")
-        return instance
+        return instances.first { $0.id == instance.id } ?? instance
     }
     
     // MARK: - Instance Updates
@@ -142,7 +149,18 @@ final class InstanceViewModel {
     func updateInstance(_ instance: AppInstance) async throws {
         logger.info("Updating instance: \(instance.name)")
         
-        // Just update storage - no bundle needed
+        // Keep an existing launcher app in sync (name, data folder, arguments)
+        var instance = instance
+        if instance.launcherPath != nil {
+            instance.launcherPath = await refreshedLauncher(for: instance)
+        }
+        
+        try await persist(instance)
+        logger.info("Successfully updated instance: \(instance.name)")
+    }
+    
+    /// Save an instance and update the local list and selection
+    private func persist(_ instance: AppInstance) async throws {
         try await store.updateInstance(instance)
         
         // Update local list
@@ -154,8 +172,6 @@ final class InstanceViewModel {
         if selectedInstance?.id == instance.id {
             selectedInstance = instance
         }
-        
-        logger.info("Successfully updated instance: \(instance.name)")
     }
     
     /// Rename an instance. Blank names are ignored; errors are shown in the error alert.
@@ -170,6 +186,78 @@ final class InstanceViewModel {
         } catch {
             handleError(error, context: "renaming instance")
         }
+    }
+    
+    // MARK: - Launcher App
+    
+    /// Create a launcher app for the instance in `folder`. Errors are shown in the error alert.
+    func createLauncher(for instance: AppInstance, in folder: URL) async {
+        do {
+            var updated = instances.first { $0.id == instance.id } ?? instance
+            let previous = updated.launcherPath
+            let launcher = try await installLauncher(for: updated, in: folder)
+            
+            // Creating it elsewhere replaces the old one
+            if let previous, previous.standardizedFileURL != launcher.standardizedFileURL,
+               LauncherBuilder.isLauncher(at: previous, for: instance.id) {
+                try? FileManager.default.trashItem(at: previous, resultingItemURL: nil)
+            }
+            
+            updated.launcherPath = launcher
+            try await persist(updated)
+            logger.info("Created launcher for \(instance.name) at \(launcher.path)")
+        } catch {
+            handleError(error, context: "creating launcher app")
+        }
+    }
+    
+    /// Reveal the launcher app in Finder
+    func revealLauncherInFinder(_ instance: AppInstance) {
+        if let launcher = instance.launcherPath {
+            LaunchServicesHelper.revealInFinder(launcher)
+        }
+    }
+    
+    /// Whether the instance has a launcher app on disk
+    func hasLauncher(_ instance: AppInstance) -> Bool {
+        guard let launcher = instance.launcherPath else { return false }
+        return LauncherBuilder.isLauncher(at: launcher, for: instance.id)
+    }
+    
+    private func installLauncher(for instance: AppInstance, in folder: URL) async throws -> URL {
+        // The launcher starts the app without PluralMac Plus, so prepare the data folder now
+        try await directLauncher.prepareDataDirectory(dataPath: instance.dataPath)
+        
+        let builder = LauncherBuilder()
+        let launcher = try builder.build(for: instance, in: folder)
+        builder.writeIcon(launcherIcon(for: instance), into: launcher)
+        builder.sign(launcher)
+        return launcher
+    }
+    
+    /// Rebuild an existing launcher; returns its (possibly renamed) location, or nil if it no longer exists
+    private func refreshedLauncher(for instance: AppInstance) async -> URL? {
+        guard let old = instance.launcherPath, LauncherBuilder.isLauncher(at: old, for: instance.id) else {
+            return nil
+        }
+        
+        do {
+            let new = try await installLauncher(for: instance, in: old.deletingLastPathComponent())
+            if new.standardizedFileURL != old.standardizedFileURL {
+                try? FileManager.default.trashItem(at: old, resultingItemURL: nil)
+            }
+            return new
+        } catch {
+            handleError(error, context: "updating launcher app")
+            return old
+        }
+    }
+    
+    private func launcherIcon(for instance: AppInstance) -> NSImage {
+        if let custom = instance.customIconPath, let image = NSImage(contentsOf: custom) {
+            return image
+        }
+        return NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
     }
     
     // MARK: - Data Folder
@@ -223,6 +311,11 @@ final class InstanceViewModel {
                 try fileManager.removeItem(at: instance.dataPath)
                 logger.debug("Deleted data at: \(instance.dataPath.path)")
             }
+        }
+        
+        // Move our launcher app to the Trash (recoverable)
+        if let launcher = instance.launcherPath, LauncherBuilder.isLauncher(at: launcher, for: instance.id) {
+            try? FileManager.default.trashItem(at: launcher, resultingItemURL: nil)
         }
         
         // Remove from storage

@@ -55,7 +55,7 @@ actor DirectLauncher {
         }
         
         // Ensure data directory exists
-        try await ensureDataDirectoryExists(dataPath: dataPath)
+        try prepareDataDirectory(dataPath: dataPath)
         
         // Launch using NSWorkspace - use continuation for callback-based API
         let runningApp: NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
@@ -181,8 +181,8 @@ actor DirectLauncher {
         }
     }
     
-    /// Ensure the data directory exists with proper structure
-    private func ensureDataDirectoryExists(dataPath: URL) async throws {
+    /// Create the data directory with the HOME redirection layout (also used for launcher apps)
+    func prepareDataDirectory(dataPath: URL) throws {
         // Don't silently start with an empty profile when the data lives on an unplugged drive
         if let volume = DataLocation.unmountedVolume(for: dataPath) {
             throw DirectLaunchError.dataVolumeUnavailable(volume)

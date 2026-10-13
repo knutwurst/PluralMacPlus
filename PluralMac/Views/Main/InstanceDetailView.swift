@@ -56,6 +56,10 @@ struct InstanceDetailView: View {
                 
                 dataIsolationSection
                 
+                Divider()
+                
+                launcherSection
+                
                 if !instance.environmentVariables.isEmpty {
                     Divider()
                     environmentSection
@@ -285,6 +289,41 @@ struct InstanceDetailView: View {
         }
     }
     
+    // MARK: - Launcher Section
+    
+    private var launcherSection: some View {
+        DetailSection(title: "Launcher App") {
+            if viewModel.hasLauncher(instance), let launcher = instance.launcherPath {
+                DetailRow(label: "Location", value: launcher.path)
+                    .contextMenu {
+                        Button("Show in Finder") {
+                            viewModel.revealLauncherInFinder(instance)
+                        }
+                    }
+                HStack(spacing: 8) {
+                    Button("Show in Finder") {
+                        viewModel.revealLauncherInFinder(instance)
+                    }
+                    Button("Recreate") {
+                        Task {
+                            await viewModel.createLauncher(for: instance, in: launcher.deletingLastPathComponent())
+                        }
+                    }
+                    Button("Move...") {
+                        createLauncher(startingAt: launcher.deletingLastPathComponent())
+                    }
+                }
+            } else {
+                Text("A small app named \"\(instance.name)\" that starts this instance directly, e.g. from the Dock, Launchpad or Spotlight.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Create Launcher App...") {
+                    createLauncher()
+                }
+            }
+        }
+    }
+    
     // MARK: - Environment Section
     
     private var environmentSection: some View {
@@ -369,6 +408,12 @@ struct InstanceDetailView: View {
                 }
                 .disabled(isRunning || isMovingData)
                 
+                Button {
+                    createLauncher()
+                } label: {
+                    Label("Create Launcher App...", systemImage: "app.badge")
+                }
+                
                 Divider()
                 
                 Button {
@@ -391,6 +436,13 @@ struct InstanceDetailView: View {
     }
     
     // MARK: - Actions
+    
+    private func createLauncher(startingAt folder: URL = LauncherFolderPicker.applicationsFolder) {
+        guard let folder = LauncherFolderPicker.choose(for: instance.name, startingAt: folder) else { return }
+        Task {
+            await viewModel.createLauncher(for: instance, in: folder)
+        }
+    }
     
     private func moveDataFolder() {
         guard let parent = DataFolderPicker.chooseParent(for: instance) else { return }
