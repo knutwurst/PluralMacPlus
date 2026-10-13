@@ -114,6 +114,13 @@ struct LauncherBuilder {
         process.waitUntilExit()
     }
 
+    /// Whether the launcher script at `bundle` matches what would be generated for `instance` now
+    func isUpToDate(_ bundle: URL, for instance: AppInstance) -> Bool {
+        let executable = bundle.appendingPathComponent("Contents/MacOS/\(Self.executableName)")
+        guard let current = try? String(contentsOf: executable, encoding: .utf8) else { return false }
+        return current == script(for: instance)
+    }
+
     /// Whether `bundle` is a launcher created for the instance with `instanceID`
     static func isLauncher(at bundle: URL, for instanceID: UUID) -> Bool {
         let plistURL = bundle.appendingPathComponent("Contents/Info.plist")

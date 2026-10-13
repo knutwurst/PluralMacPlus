@@ -100,6 +100,22 @@ final class InstanceViewModel {
         
         // Instances may still be running from before PluralMac Plus was (re)opened
         await discoverRunningInstances()
+        
+        await refreshOutdatedLaunchers()
+    }
+    
+    /// Rebuild launcher apps whose script no longer matches the instance (e.g. after an app update)
+    private func refreshOutdatedLaunchers() async {
+        let builder = LauncherBuilder()
+        for instance in instances {
+            guard let launcher = instance.launcherPath,
+                  LauncherBuilder.isLauncher(at: launcher, for: instance.id),
+                  !builder.isUpToDate(launcher, for: instance) else {
+                continue
+            }
+            logger.info("Updating outdated launcher of \(instance.name)")
+            try? await updateInstance(instance)
+        }
     }
     
     /// Find running processes that belong to instances and track them
