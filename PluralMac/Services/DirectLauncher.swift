@@ -138,6 +138,12 @@ actor DirectLauncher {
         startMonitoring(instanceId: instanceId, app: app)
     }
     
+    /// Process ID of a running instance
+    func runningPID(_ instanceId: UUID) -> pid_t? {
+        guard let app = runningApps[instanceId], !app.isTerminated else { return nil }
+        return app.processIdentifier
+    }
+    
     /// Get the running app for an instance
     func getRunningApp(_ instanceId: UUID) -> NSRunningApplication? {
         runningApps[instanceId]

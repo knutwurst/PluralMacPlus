@@ -182,8 +182,14 @@ final class MenuBarManager: NSObject, ObservableObject {
         
         Task {
             do {
-                _ = try await LaunchServicesHelper.launchAsync(instance.shortcutPath)
-                logger.info("Launched instance from menu bar: \(instance.name)")
+                // Running: bring to front; otherwise launch
+                if let pid = await DirectLauncher.shared.runningPID(instance.id),
+                   let app = NSRunningApplication(processIdentifier: pid) {
+                    InstanceActivator.bringToFront(app)
+                } else {
+                    try await DirectLauncher.shared.launch(instance)
+                    logger.info("Launched instance from menu bar: \(instance.name)")
+                }
             } catch {
                 logger.error("Failed to launch instance: \(error.localizedDescription)")
             }

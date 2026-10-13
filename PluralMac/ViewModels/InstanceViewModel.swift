@@ -388,16 +388,14 @@ final class InstanceViewModel {
     
     // MARK: - Instance Launching
     
-    /// Launch an instance directly as a child process
+    /// Launch an instance, or bring it to the front if it is already running
     func launchInstance(_ instance: AppInstance) async throws {
-        logger.info("Launching instance directly: \(instance.name)")
-        
-        // Check if already running
         if await directLauncher.isRunning(instance.id) {
-            logger.warning("Instance already running: \(instance.name)")
-            // Just bring to front if already running
+            await bringToFront(instance)
             return
         }
+        
+        logger.info("Launching instance directly: \(instance.name)")
         
         // Launch the app directly with modified environment
         let process = try await directLauncher.launch(instance)
@@ -412,6 +410,16 @@ final class InstanceViewModel {
         }
         
         logger.info("Successfully launched instance: \(instance.name) (PID: \(process.processIdentifier))")
+    }
+    
+    /// Bring a running instance to the front and restore a minimized window
+    func bringToFront(_ instance: AppInstance) async {
+        guard let pid = await directLauncher.runningPID(instance.id),
+              let app = NSRunningApplication(processIdentifier: pid) else {
+            return
+        }
+        logger.info("Bringing instance to front: \(instance.name)")
+        InstanceActivator.bringToFront(app)
     }
     
     /// Check if an instance is currently running

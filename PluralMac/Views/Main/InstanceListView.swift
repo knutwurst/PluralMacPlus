@@ -34,7 +34,7 @@ struct InstanceListView: View {
         .contextMenu(forSelectionType: UUID.self) { ids in
             contextMenuContent(for: ids)
         } primaryAction: { ids in
-            // Double-click to launch
+            // Double-click: launch, or bring a running instance to the front
             if let id = ids.first,
                let instance = viewModel.instances.first(where: { $0.id == id }) {
                 Task {

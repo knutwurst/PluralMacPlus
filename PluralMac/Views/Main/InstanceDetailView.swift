@@ -183,6 +183,16 @@ struct InstanceDetailView: View {
             // Launch or Stop button
             if isRunning {
                 HStack(spacing: 8) {
+                    Button {
+                        Task {
+                            await viewModel.bringToFront(instance)
+                        }
+                    } label: {
+                        Label("Show", systemImage: "macwindow")
+                    }
+                    .controlSize(.large)
+                    .help("Bring to front and restore minimized windows")
+                    
                     // Stop button
                     Button(role: .destructive) {
                         Task {
