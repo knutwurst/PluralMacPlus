@@ -6,6 +6,8 @@
 //
 
 import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -82,6 +84,24 @@ struct LauncherBuilder {
             }
         }
         CGImageDestinationFinalize(destination)
+    }
+
+    /// Returns `image` with its hue rotated by `hueDegrees`
+    static func tinted(_ image: NSImage, hueDegrees: Double) -> NSImage {
+        var rect = NSRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
+            return image
+        }
+
+        let filter = CIFilter.hueAdjust()
+        filter.inputImage = CIImage(cgImage: cgImage)
+        filter.angle = Float(hueDegrees * .pi / 180)
+
+        guard let output = filter.outputImage,
+              let result = CIContext().createCGImage(output, from: output.extent) else {
+            return image
+        }
+        return NSImage(cgImage: result, size: image.size)
     }
 
     /// Ad-hoc signs the bundle. Failure is not fatal: a locally created launcher runs unsigned.

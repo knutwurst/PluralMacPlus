@@ -105,6 +105,7 @@ final class InstanceViewModel {
     ///   - customIconPath: Optional custom icon
     ///   - dataPath: Optional data folder (nil = Data Directory setting)
     ///   - launcherFolder: Folder for a launcher app (nil = no launcher)
+    ///   - launcherIconHue: Hue rotation for the launcher icon (nil = original colors)
     /// - Returns: The created instance
     @discardableResult
     func createInstance(
@@ -114,7 +115,8 @@ final class InstanceViewModel {
         arguments: [String] = [],
         customIconPath: URL? = nil,
         dataPath: URL? = nil,
-        launcherFolder: URL? = nil
+        launcherFolder: URL? = nil,
+        launcherIconHue: Double? = nil
     ) async throws -> AppInstance {
         logger.info("Creating instance: \(name) for \(application.name)")
         
@@ -127,6 +129,7 @@ final class InstanceViewModel {
         instance.environmentVariables = environmentVariables
         instance.commandLineArguments = arguments
         instance.customIconPath = customIconPath
+        instance.launcherIconHue = launcherIconHue
         
         // No bundle creation needed - we launch directly!
         // Just save to storage
@@ -253,11 +256,31 @@ final class InstanceViewModel {
         }
     }
     
-    private func launcherIcon(for instance: AppInstance) -> NSImage {
+    /// Icon for the launcher app, including the hue chosen for the instance
+    func launcherIcon(for instance: AppInstance) -> NSImage {
+        let base: NSImage
         if let custom = instance.customIconPath, let image = NSImage(contentsOf: custom) {
-            return image
+            base = image
+        } else {
+            base = NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
+            base.size = NSSize(width: 512, height: 512)
         }
-        return NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
+        
+        guard let hue = instance.launcherIconHue else { return base }
+        return LauncherBuilder.tinted(base, hueDegrees: hue)
+    }
+    
+    /// Change the launcher icon color; an existing launcher is rebuilt. Errors are shown in the error alert.
+    func setLauncherIconHue(_ instance: AppInstance, hue: Double?) async {
+        var updated = instance
+        updated.launcherIconHue = hue
+        updated.touch()
+        
+        do {
+            try await updateInstance(updated)
+        } catch {
+            handleError(error, context: "changing launcher icon")
+        }
     }
     
     // MARK: - Data Folder

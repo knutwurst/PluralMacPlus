@@ -51,6 +51,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Launcher app created for this instance (nil = none)
     var launcherPath: URL?
     
+    /// Hue rotation in degrees applied to the launcher icon (nil = original colors)
+    var launcherIconHue: Double?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -108,6 +111,7 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         self.commandLineArguments = []
         self.customIconPath = nil
         self.launcherPath = nil
+        self.launcherIconHue = nil
         self.isolationMethodOverride = nil
         self.eraseDataOnQuit = false
         self.showMenuBarIcon = false
@@ -291,6 +295,7 @@ extension AppInstance {
         case commandLineArguments
         case customIconPath
         case launcherPath
+        case launcherIconHue
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon

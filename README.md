@@ -21,7 +21,7 @@
 
 > **PluralMac Plus** is a fork of [Devrax/PluralMac](https://github.com/Devrax/PluralMac) with these additions:
 >
-> - **Launcher apps**: create a small app named after the instance (in `/Applications` or anywhere else) that starts the instance directly, from the Dock, Launchpad or Spotlight, without opening PluralMac Plus. It is updated when the instance changes and moved to the Trash when the instance is deleted.
+> - **Launcher apps**: create a small app named after the instance (in `/Applications` or anywhere else) that starts the instance directly, from the Dock, Launchpad or Spotlight, without opening PluralMac Plus. It is updated when the instance changes and moved to the Trash when the instance is deleted. The launcher icon color can be changed with a hue slider. The running app keeps its own name and icon in the Dock.
 > - **Choose the data folder when creating an instance**: pick a new folder, or point to a folder with existing data. PluralMac Plus asks whether to continue with that data or choose another folder. Nothing is ever deleted.
 > - **Default data location**: Settings → Storage → Data Directory sets where new instances store their data (default `~/Library/PluralMac/Data`).
 > - **Move Data Folder…** for existing instances, e.g. to an external drive. The instance must not be running.

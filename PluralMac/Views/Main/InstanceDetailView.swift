@@ -26,6 +26,7 @@ struct InstanceDetailView: View {
     @State private var showExportSheet = false
     @State private var showDuplicateSheet = false
     @State private var duplicateName: String = ""
+    @State private var launcherIconHue: Double?
     
     @ObservedObject private var runningManager = RunningInstancesManager.shared
     
@@ -321,7 +322,35 @@ struct InstanceDetailView: View {
                     createLauncher()
                 }
             }
+            
+            LauncherIconColorPicker(
+                baseIcon: launcherBaseIcon,
+                hue: $launcherIconHue
+            )
+            
+            if launcherIconHue != instance.launcherIconHue {
+                HStack(spacing: 8) {
+                    Button("Apply Color") {
+                        Task {
+                            await viewModel.setLauncherIconHue(instance, hue: launcherIconHue)
+                        }
+                    }
+                    Button("Revert") {
+                        launcherIconHue = instance.launcherIconHue
+                    }
+                }
+            }
         }
+        .onAppear { launcherIconHue = instance.launcherIconHue }
+        .onChange(of: instance.id) { _, _ in launcherIconHue = instance.launcherIconHue }
+        .onChange(of: instance.launcherIconHue) { _, newValue in launcherIconHue = newValue }
+    }
+    
+    /// Launcher icon in its original colors
+    private var launcherBaseIcon: NSImage {
+        var untinted = instance
+        untinted.launcherIconHue = nil
+        return viewModel.launcherIcon(for: untinted)
     }
     
     // MARK: - Environment Section

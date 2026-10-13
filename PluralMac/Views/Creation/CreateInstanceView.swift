@@ -43,6 +43,7 @@ struct CreateInstanceView: View {
     // Launcher app
     @State private var createLauncher = true
     @State private var launcherFolder = LauncherFolderPicker.applicationsFolder
+    @State private var launcherIconHue: Double?
     
     // MARK: - Body
     
@@ -245,6 +246,13 @@ struct CreateInstanceView: View {
                             launcherFolder = folder
                         }
                     }
+                }
+                
+                if let appURL = selectedAppURL {
+                    LauncherIconColorPicker(
+                        baseIcon: selectedIcon ?? NSWorkspace.shared.icon(forFile: appURL.path),
+                        hue: $launcherIconHue
+                    )
                 }
             }
         } header: {
@@ -482,7 +490,8 @@ struct CreateInstanceView: View {
                 arguments: commandLineArguments,
                 customIconPath: customIconPath,
                 dataPath: customDataPath,
-                launcherFolder: createLauncher ? launcherFolder : nil
+                launcherFolder: createLauncher ? launcherFolder : nil,
+                launcherIconHue: launcherIconHue
             )
             dismiss()
         } catch {
