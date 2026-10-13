@@ -63,5 +63,3 @@ iOSInjectionProject/
 # Local release builds (scripts/build-release.sh)
 dist/
 
-# Local migration data, never commit
-TG_Windows/
