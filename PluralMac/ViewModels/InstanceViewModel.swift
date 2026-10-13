@@ -71,7 +71,18 @@ final class InstanceViewModel {
     
     // MARK: - Initialization
     
-    init() {}
+    init() {
+        // Pick up instances started by launcher apps while PluralMac Plus is open
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.discoverRunningInstances()
+            }
+        }
+    }
     
     // MARK: - Data Loading
     
@@ -85,6 +96,19 @@ final class InstanceViewModel {
             logger.info("Loaded \(self.instances.count) instances")
         } catch {
             handleError(error, context: "loading instances")
+        }
+        
+        // Instances may still be running from before PluralMac Plus was (re)opened
+        await discoverRunningInstances()
+    }
+    
+    /// Find running processes that belong to instances and track them
+    func discoverRunningInstances() async {
+        let processes = RunningInstanceMatcher.runningProcesses(for: instances)
+        let matches = RunningInstanceMatcher.match(instances: instances, processes: processes)
+        
+        for (instanceId, pid) in matches {
+            await directLauncher.adopt(instanceId, pid: pid)
         }
     }
     

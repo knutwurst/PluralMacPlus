@@ -117,6 +117,27 @@ actor DirectLauncher {
         return !app.isTerminated
     }
     
+    /// Track an instance process that was started elsewhere (before PluralMac Plus was opened, or by a launcher app)
+    func adopt(_ instanceId: UUID, pid: pid_t) {
+        guard !isRunning(instanceId),
+              let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
+            return
+        }
+        
+        runningApps[instanceId] = app
+        logger.info("Found running instance \(instanceId.uuidString) (PID: \(pid))")
+        
+        Task { @MainActor in
+            NotificationCenter.default.post(
+                name: .instanceLaunched,
+                object: nil,
+                userInfo: ["instanceId": instanceId]
+            )
+        }
+        
+        startMonitoring(instanceId: instanceId, app: app)
+    }
+    
     /// Get the running app for an instance
     func getRunningApp(_ instanceId: UUID) -> NSRunningApplication? {
         runningApps[instanceId]
