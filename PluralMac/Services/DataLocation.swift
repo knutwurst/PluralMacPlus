@@ -2,6 +2,8 @@
 //  DataLocation.swift
 //  PluralMac
 //
+//  Created by Knutwurst on 13.10.26.
+//
 
 import Foundation
 

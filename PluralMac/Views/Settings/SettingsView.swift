@@ -2,7 +2,8 @@
 //  SettingsView.swift
 //  PluralMac
 //
-//  Created by Rafael Alexander Mejia Blanco on 4/2/26.
+//  Maintained by Knutwurst.
+//  Originally created by Rafael Alexander Mejia Blanco on 4/2/26.
 //
 
 import SwiftUI
