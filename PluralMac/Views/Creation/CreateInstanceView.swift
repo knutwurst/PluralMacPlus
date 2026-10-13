@@ -292,14 +292,9 @@ struct CreateInstanceView: View {
     
     private var advancedOptionsSection: some View {
         Section(isExpanded: $showAdvancedOptions) {
-            // Environment Variables
-            DisclosureGroup("Environment Variables") {
-                environmentVariablesEditor
-            }
-            
-            // Command Line Arguments
-            DisclosureGroup("Command Line Arguments") {
-                argumentsEditor
+            DisclosureGroup("Environment Variables & Arguments") {
+                LaunchOptionsEditor(environment: $environmentVariables, arguments: $commandLineArguments)
+                    .padding(.vertical, 4)
             }
             
             // Custom Icon
@@ -318,69 +313,6 @@ struct CreateInstanceView: View {
         } header: {
             Text("Advanced Options")
         }
-    }
-    
-    // MARK: - Environment Variables Editor
-    
-    private var environmentVariablesEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(environmentVariables.keys.sorted()), id: \.self) { key in
-                HStack {
-                    Text(key)
-                        .font(.system(.body, design: .monospaced))
-                    Text("=")
-                        .foregroundStyle(.secondary)
-                    Text(environmentVariables[key] ?? "")
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button {
-                        environmentVariables.removeValue(forKey: key)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            
-            Button {
-                // TODO: Show add env var sheet
-            } label: {
-                Label("Add Variable", systemImage: "plus")
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(.vertical, 4)
-    }
-    
-    // MARK: - Arguments Editor
-    
-    private var argumentsEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(commandLineArguments, id: \.self) { arg in
-                HStack {
-                    Text(arg)
-                        .font(.system(.body, design: .monospaced))
-                    Spacer()
-                    Button {
-                        commandLineArguments.removeAll { $0 == arg }
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            
-            Button {
-                // TODO: Show add argument sheet
-            } label: {
-                Label("Add Argument", systemImage: "plus")
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(.vertical, 4)
     }
     
     // MARK: - Helper Views

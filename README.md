@@ -40,7 +40,7 @@ There are no pre-built releases yet. I'll publish 1.1 when I consider it done.
 
 Click +, choose the app, give the instance a name, and decide on the data folder and whether you want a launcher. The first start looks like a fresh install, so you sign in again.
 
-Everything else lives in the sidebar's context menu and the detail view: rename, duplicate, move the data folder, manage the launcher, stop, delete. "Delete Shortcut" keeps the data; "Delete Shortcut & Data" removes it too.
+Everything else lives in the sidebar's context menu and the detail view: rename, duplicate, move the data folder, manage the launcher, set extra environment variables and arguments, stop, delete. Drag instances in the sidebar to change their order. "Delete Shortcut" keeps the data; "Delete Shortcut & Data" removes it too.
 
 ## How it works
 

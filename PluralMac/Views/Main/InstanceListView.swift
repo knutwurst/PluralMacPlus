@@ -29,6 +29,8 @@ struct InstanceListView: View {
                     .tag(instance.id)
             }
             .onDelete(perform: deleteInstances)
+            // Reordering only makes sense on the unfiltered list
+            .onMove(perform: moveHandler)
         }
         .listStyle(.sidebar)
         .contextMenu(forSelectionType: UUID.self) { ids in
@@ -41,6 +43,17 @@ struct InstanceListView: View {
                     try? await viewModel.launchInstance(instance)
                 }
             }
+        }
+    }
+    
+    private var moveHandler: ((IndexSet, Int) -> Void)? {
+        guard viewModel.searchText.isEmpty else { return nil }
+        return { source, destination in moveInstances(from: source, to: destination) }
+    }
+    
+    private func moveInstances(from source: IndexSet, to destination: Int) {
+        Task {
+            await viewModel.moveInstances(from: source, to: destination)
         }
     }
     

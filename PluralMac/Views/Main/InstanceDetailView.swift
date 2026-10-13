@@ -27,6 +27,9 @@ struct InstanceDetailView: View {
     @State private var showDuplicateSheet = false
     @State private var duplicateName: String = ""
     @State private var launcherIconHue: Double?
+    @State private var showLaunchOptionsEditor = false
+    @State private var editedEnvironment: [String: String] = [:]
+    @State private var editedArguments: [String] = []
     
     @ObservedObject private var runningManager = RunningInstancesManager.shared
     
@@ -61,15 +64,9 @@ struct InstanceDetailView: View {
                 
                 launcherSection
                 
-                if !instance.environmentVariables.isEmpty {
-                    Divider()
-                    environmentSection
-                }
+                Divider()
                 
-                if !instance.commandLineArguments.isEmpty {
-                    Divider()
-                    argumentsSection
-                }
+                launchOptionsSection
                 
                 Divider()
                 
@@ -369,25 +366,58 @@ struct InstanceDetailView: View {
         return viewModel.launcherIcon(for: untinted)
     }
     
-    // MARK: - Environment Section
+    // MARK: - Launch Options Section
     
-    private var environmentSection: some View {
-        DetailSection(title: "Environment Variables") {
+    private var launchOptionsSection: some View {
+        DetailSection(title: "Environment Variables & Arguments") {
             ForEach(Array(instance.environmentVariables.keys.sorted()), id: \.self) { key in
                 DetailRow(label: key, value: instance.environmentVariables[key] ?? "")
             }
-        }
-    }
-    
-    // MARK: - Arguments Section
-    
-    private var argumentsSection: some View {
-        DetailSection(title: "Command Line Arguments") {
-            ForEach(instance.commandLineArguments, id: \.self) { arg in
-                Text(arg)
+            ForEach(Array(instance.commandLineArguments.enumerated()), id: \.offset) { _, argument in
+                Text(argument)
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
+            if instance.environmentVariables.isEmpty && instance.commandLineArguments.isEmpty {
+                Text("None. The isolation variables are added automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Edit...") {
+                editedEnvironment = instance.environmentVariables
+                editedArguments = instance.commandLineArguments
+                showLaunchOptionsEditor = true
+            }
+        }
+        .sheet(isPresented: $showLaunchOptionsEditor) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Edit \(instance.name)")
+                    .font(.title2)
+                LaunchOptionsEditor(environment: $editedEnvironment, arguments: $editedArguments)
+                Text("Changes apply the next time the instance starts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Spacer()
+                    Button("Cancel", role: .cancel) {
+                        showLaunchOptionsEditor = false
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    Button("Save") {
+                        var updated = instance
+                        updated.environmentVariables = editedEnvironment
+                        updated.commandLineArguments = editedArguments
+                        updated.touch()
+                        showLaunchOptionsEditor = false
+                        Task {
+                            try? await viewModel.updateInstance(updated)
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+            .padding(20)
+            .frame(width: 520)
         }
     }
     

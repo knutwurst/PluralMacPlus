@@ -368,6 +368,18 @@ final class InstanceViewModel {
         }
     }
     
+    // MARK: - Ordering
+    
+    /// Reorder instances in the sidebar and save the new order
+    func moveInstances(from source: IndexSet, to destination: Int) async {
+        instances = InstanceOrdering.move(instances, from: source, to: destination)
+        do {
+            try await store.saveInstances(instances)
+        } catch {
+            handleError(error, context: "saving instance order")
+        }
+    }
+    
     // MARK: - Instance Deletion
     
     /// Delete an instance
