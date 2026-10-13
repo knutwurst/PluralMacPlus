@@ -12,13 +12,13 @@ struct SettingsView: View {
     
     // MARK: - Properties
     
-    @AppStorage("defaultDataDirectory") private var defaultDataDirectory: String = ""
+    @AppStorage(DataLocation.defaultsKey) private var defaultDataDirectory: String = ""
     @AppStorage("showDockBadges") private var showDockBadges: Bool = true
     @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete: Bool = true
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = false
     @AppStorage("keepRunningInBackground") private var keepRunningInBackground: Bool = false
     
-    @EnvironmentObject private var menuBarManager: MenuBarManager
+    @ObservedObject private var menuBarManager = MenuBarManager.shared
     
     @State private var selectedTab: SettingsTab = .general
     
@@ -82,7 +82,7 @@ struct GeneralSettingsTab: View {
                 Toggle("Keep running when window is closed", isOn: $keepRunningInBackground)
                     .disabled(!showMenuBarIcon)
                 
-                Text("When enabled, PluralMac stays in the menu bar for quick access.")
+                Text("When enabled, PluralMac Plus stays in the menu bar for quick access.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -109,7 +109,7 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 
-                Text("Where instance data is stored. Leave empty for default location.")
+                Text("Where data of new instances is stored. Leave empty for ~/Library/PluralMac/Data. Existing instances keep their folder; use \"Move Data Folder...\" to relocate them.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -174,11 +174,11 @@ struct AboutSettingsTab: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.blue)
             
-            Text("PluralMac")
+            Text("PluralMac Plus")
                 .font(.title)
                 .fontWeight(.bold)
             
-            Text("Version 1.0")
+            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             
@@ -190,14 +190,14 @@ struct AboutSettingsTab: View {
             Spacer()
             
             HStack {
-                Link("Website", destination: URL(string: "https://pluralmac.com")!)
+                Link("Original PluralMac", destination: URL(string: "https://github.com/Devrax/PluralMac")!)
                 Text("•")
                     .foregroundStyle(.tertiary)
-                Link("GitHub", destination: URL(string: "https://github.com/mtech/PluralMac")!)
+                Link("GitHub", destination: URL(string: "https://github.com/knutwurst/PluralMacPlus")!)
             }
             .font(.caption)
             
-            Text("© 2026 MTech. All rights reserved.")
+            Text("© 2026 Knutwurst")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             
