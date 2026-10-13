@@ -151,7 +151,7 @@ struct InstanceDetailView: View {
                 
                 HStack(spacing: 6) {
                     Image(systemName: instance.targetAppType.compatibilityLevel.symbolName)
-                        .foregroundStyle(compatibilityColor)
+                        .foregroundStyle(instance.targetAppType.compatibilityLevel.color)
                     
                     Text(instance.targetAppType.displayName)
                         .foregroundStyle(.secondary)
@@ -213,14 +213,6 @@ struct InstanceDetailView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             }
-        }
-    }
-    
-    private var compatibilityColor: Color {
-        switch instance.targetAppType.compatibilityLevel {
-        case .full: return .green
-        case .partial: return .yellow
-        case .unsupported: return .red
         }
     }
     

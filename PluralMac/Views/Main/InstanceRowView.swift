@@ -127,17 +127,10 @@ struct InstanceRowView: View {
         
         return Image(systemName: level.symbolName)
             .font(.caption2)
-            .foregroundStyle(compatibilityColor(for: level))
+            .foregroundStyle(level.color)
             .help(instance.targetAppType.displayName)
     }
-    
-    private func compatibilityColor(for level: CompatibilityLevel) -> Color {
-        switch level {
-        case .full: return .green
-        case .partial: return .yellow
-        case .unsupported: return .red
-        }
-    }
+
     
     // MARK: - Computed Properties
     

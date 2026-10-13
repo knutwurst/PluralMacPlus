@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// Represents the type of macOS application for determining
 /// the appropriate data isolation strategy.
@@ -116,7 +117,7 @@ enum CompatibilityLevel: String, Codable, Sendable {
     /// ✅ Fully supported and tested
     case full
     
-    /// ⚠️ May work, not fully tested
+    /// Isolated through its own home folder (HOME/CFFIXED_USER_HOME); works for apps using the usual Library folders
     case partial
     
     /// ❌ Not supported
@@ -126,7 +127,7 @@ enum CompatibilityLevel: String, Codable, Sendable {
     var symbolName: String {
         switch self {
         case .full: return "checkmark.circle.fill"
-        case .partial: return "exclamationmark.triangle.fill"
+        case .partial: return "house.circle.fill"
         case .unsupported: return "xmark.circle.fill"
         }
     }
@@ -135,8 +136,19 @@ enum CompatibilityLevel: String, Codable, Sendable {
     var colorName: String {
         switch self {
         case .full: return "green"
-        case .partial: return "yellow"
+        case .partial: return "blue"
         case .unsupported: return "red"
+        }
+    }
+}
+
+extension CompatibilityLevel {
+    /// Color of the indicator
+    var color: Color {
+        switch self {
+        case .full: return .green
+        case .partial: return .blue
+        case .unsupported: return .red
         }
     }
 }

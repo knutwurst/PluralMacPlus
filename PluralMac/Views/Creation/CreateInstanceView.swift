@@ -269,7 +269,7 @@ struct CreateInstanceView: View {
             LabeledContent("App Type") {
                 HStack {
                     Image(systemName: app.appType.compatibilityLevel.symbolName)
-                        .foregroundStyle(compatibilityColor(for: app.appType.compatibilityLevel))
+                        .foregroundStyle(app.appType.compatibilityLevel.color)
                     Text(app.appType.displayName)
                 }
             }
@@ -327,13 +327,7 @@ struct CreateInstanceView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
-    private func compatibilityColor(for level: CompatibilityLevel) -> Color {
-        switch level {
-        case .full: return .green
-        case .partial: return .yellow
-        case .unsupported: return .red
-        }
-    }
+
     
     // MARK: - Computed Properties
     
