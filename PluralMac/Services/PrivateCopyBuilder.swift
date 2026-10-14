@@ -18,6 +18,9 @@ struct PrivateAppCopy: Codable, Hashable, Sendable {
     var originalVersion: String
 
     var createdAt: Date
+
+    /// Icon hue the copy was built with (nil = original colors)
+    var iconHue: Double?
 }
 
 /// Builds private app copies: an APFS clone of the original, renamed to the instance, with its own
@@ -281,6 +284,15 @@ extension PrivateCopyBuilder {
         let info = NSDictionary(contentsOf: instance.targetAppPath.appendingPathComponent("Contents/Info.plist"))
         let executable = info?["CFBundleExecutable"] as? String ?? ""
         return LauncherBuilder().copyStartScript(for: instance, executableName: executable)
+    }
+
+    /// Whether name, icon color or start script of the copy no longer match the instance
+    static func needsRefresh(_ instance: AppInstance) -> Bool {
+        guard let copy = instance.privateCopy else { return false }
+        let name = NSDictionary(contentsOf: copy.path.appendingPathComponent("Contents/Info.plist"))?["CFBundleName"] as? String
+        return name != instance.name
+            || copy.iconHue != instance.launcherIconHue
+            || isStartScriptOutdated(instance)
     }
 
     /// Whether the copy's code signature verifies (a broken one keeps macOS from starting it)

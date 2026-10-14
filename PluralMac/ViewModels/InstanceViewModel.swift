@@ -132,7 +132,7 @@ final class InstanceViewModel {
     /// a current start script; running instances are skipped and handled when they quit
     func refreshOutdatedPrivateCopies() async {
         guard !AppEnvironment.isRunningTests else { return }
-        for instance in instances where PrivateCopyBuilder.isStartScriptOutdated(instance)
+        for instance in instances where PrivateCopyBuilder.needsRefresh(instance)
             || instance.privateCopy.map({ !PrivateCopyBuilder.isSignatureValid($0.path) }) == true {
             guard !(await directLauncher.isRunning(instance.id)) else { continue }
             var updated = instance
@@ -244,7 +244,7 @@ final class InstanceViewModel {
         
         // Keep an existing launcher app and private copy in sync (name, data folder, arguments)
         var instance = instance
-        if PrivateCopyBuilder.isStartScriptOutdated(instance) {
+        if PrivateCopyBuilder.needsRefresh(instance) {
             try await refreshPrivateCopyIdentityIfIdle(&instance)
         }
         if instance.launcherPath != nil {
@@ -278,7 +278,6 @@ final class InstanceViewModel {
         updated.rename(to: name)
         
         do {
-            try await refreshPrivateCopyIdentityIfIdle(&updated)
             try await updateInstance(updated)
         } catch {
             handleError(error, context: "renaming instance")
@@ -386,10 +385,9 @@ final class InstanceViewModel {
         updated.touch()
         
         do {
-            try await refreshPrivateCopyIdentityIfIdle(&updated)
             try await updateInstance(updated)
         } catch {
-            handleError(error, context: "changing launcher icon")
+            handleError(error, context: "changing icon color")
         }
     }
     
@@ -416,7 +414,9 @@ final class InstanceViewModel {
             }.value
             
             var updated = instances.first { $0.id == instance.id } ?? instance
-            updated.privateCopy = copy
+            var built = copy
+            built.iconHue = instance.launcherIconHue
+            updated.privateCopy = built
             updated.touch()
             try await updateInstance(updated)
             logger.info("Built private copy of \(instance.name) at \(copy.path.path)")
@@ -459,9 +459,11 @@ final class InstanceViewModel {
         let id = instance.id, name = instance.name, original = instance.targetAppPath
         let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
         let startScript = PrivateCopyBuilder.startScript(for: instance)
-        instance.privateCopy = try await Task.detached {
+        var refreshed = try await Task.detached {
             try PrivateCopyBuilder().updateIdentity(of: current, instanceID: id, name: name, original: original, iconPNG: icon, startScript: startScript)
         }.value
+        refreshed.iconHue = instance.launcherIconHue
+        instance.privateCopy = refreshed
     }
     
     // MARK: - Data Folder
@@ -617,9 +619,7 @@ final class InstanceViewModel {
         
         // A rename or icon change while the instance ran is applied to the copy now
         var instance = instance
-        if let copy = instance.privateCopy,
-           (NSDictionary(contentsOf: copy.path.appendingPathComponent("Contents/Info.plist"))?["CFBundleName"] as? String) != instance.name
-            || PrivateCopyBuilder.isStartScriptOutdated(instance) {
+        if PrivateCopyBuilder.needsRefresh(instance) {
             try await refreshPrivateCopyIdentityIfIdle(&instance)
             try await updateInstance(instance)
         }

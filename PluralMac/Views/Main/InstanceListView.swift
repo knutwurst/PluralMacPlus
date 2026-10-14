@@ -97,14 +97,17 @@ struct InstanceListView: View {
                 Label("Move Data Folder...", systemImage: "externaldrive")
             }
             
-            Button {
-                if let folder = LauncherFolderPicker.choose(for: instance.name) {
-                    Task {
-                        await viewModel.createLauncher(for: instance, in: folder)
+            // An instance with a private copy starts from the copy itself
+            if instance.privateCopy == nil {
+                Button {
+                    if let folder = LauncherFolderPicker.choose(for: instance.name) {
+                        Task {
+                            await viewModel.createLauncher(for: instance, in: folder)
+                        }
                     }
+                } label: {
+                    Label("Create Launcher App...", systemImage: "app.badge")
                 }
-            } label: {
-                Label("Create Launcher App...", systemImage: "app.badge")
             }
             .disabled(RunningInstancesManager.shared.isRunning(instance.id) || viewModel.instancesMovingData.contains(instance.id))
             

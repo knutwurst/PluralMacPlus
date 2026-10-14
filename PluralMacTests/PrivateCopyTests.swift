@@ -207,6 +207,23 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertFalse(PrivateCopyBuilder.isSignatureValid(instance.privateCopy!.path))
     }
 
+    func testCopyNeedsRefreshWhenIconColorOrNameChanged() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        instance.launcherIconHue = 120
+        var copy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+        copy.iconHue = instance.launcherIconHue
+        instance.privateCopy = copy
+        XCTAssertFalse(PrivateCopyBuilder.needsRefresh(instance))
+
+        instance.launcherIconHue = 240
+        XCTAssertTrue(PrivateCopyBuilder.needsRefresh(instance))
+
+        instance.launcherIconHue = 120
+        instance.name = "Renamed"
+        XCTAssertTrue(PrivateCopyBuilder.needsRefresh(instance))
+    }
+
     func testInstanceLaunchesAndMatchesTheCopy() throws {
         let original = try makeHardenedApp()
         var instance = try makeInstance(app: original)

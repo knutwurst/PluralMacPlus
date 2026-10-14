@@ -64,6 +64,10 @@ struct InstanceDetailView: View {
                 
                 Divider()
                 
+                iconSection
+                
+                Divider()
+                
                 launcherSection
                 
                 Divider()
@@ -412,7 +416,19 @@ struct InstanceDetailView: View {
     
     private var launcherSection: some View {
         DetailSection(title: "Launcher App") {
-            if viewModel.hasLauncher(instance), let launcher = instance.launcherPath {
+            if instance.privateCopy != nil {
+                Text("Not needed: this instance runs from its own copy of the app, which starts the instance by itself. Keep it in the Dock (Options → Keep in Dock) or open it from Finder or Spotlight.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if viewModel.hasLauncher(instance) {
+                    Button("Remove Launcher", role: .destructive) {
+                        Task {
+                            await viewModel.removeLauncher(for: instance)
+                        }
+                    }
+                    .help("Moves the launcher app to the Trash")
+                }
+            } else if viewModel.hasLauncher(instance), let launcher = instance.launcherPath {
                 DetailRow(label: "Location", value: launcher.path)
                     .contextMenu {
                         Button("Show in Finder") {
@@ -446,7 +462,13 @@ struct InstanceDetailView: View {
                     createLauncher()
                 }
             }
-            
+        }
+    }
+    
+    // MARK: - App Icon Section
+    
+    private var iconSection: some View {
+        DetailSection(title: "App Icon") {
             LauncherIconColorPicker(
                 baseIcon: launcherBaseIcon,
                 hue: $launcherIconHue
@@ -464,10 +486,23 @@ struct InstanceDetailView: View {
                     }
                 }
             }
+            
+            Text(iconCaption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .onAppear { launcherIconHue = instance.launcherIconHue }
         .onChange(of: instance.id) { _, _ in launcherIconHue = instance.launcherIconHue }
         .onChange(of: instance.launcherIconHue) { _, newValue in launcherIconHue = newValue }
+    }
+    
+    private var iconCaption: String {
+        if instance.privateCopy != nil {
+            return isRunning
+                ? "Used by the app copy in the Dock and Cmd-Tab. A new color applies after the instance quits."
+                : "Used by the app copy in the Dock and Cmd-Tab" + (viewModel.hasLauncher(instance) ? " and by the launcher app." : ".")
+        }
+        return "Used by the launcher app. While the instance runs, the Dock shows the original app's icon; a private copy shows this one."
     }
     
     /// Launcher icon in its original colors
