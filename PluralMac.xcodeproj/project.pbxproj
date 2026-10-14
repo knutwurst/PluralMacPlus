@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BB10000000000000000000BC /* libPMPPreferences.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = BB10000000000000000000B1 /* libPMPPreferences.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		AA10000000000000000000A7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -14,11 +18,33 @@
 			remoteGlobalIDString = DFFBD9342F33BAD800B7EA3F;
 			remoteInfo = PluralMac;
 		};
+		BB10000000000000000000B9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DFFBD92D2F33BAD800B7EA3F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BB10000000000000000000B3;
+			remoteInfo = PreferencesShim;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BB10000000000000000000BB /* Embed Libraries */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				BB10000000000000000000BC /* libPMPPreferences.dylib in Embed Libraries */,
+			);
+			name = "Embed Libraries";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		DFFBD9352F33BAD800B7EA3F /* PluralMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PluralMac Plus.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA10000000000000000000A1 /* PluralMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluralMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB10000000000000000000B1 /* libPMPPreferences.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libPMPPreferences.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -45,6 +71,11 @@
 			path = PluralMacTests;
 			sourceTree = "<group>";
 		};
+		BB10000000000000000000B2 /* PreferencesShim */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PreferencesShim;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +93,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB10000000000000000000B5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -71,6 +109,7 @@
 				DFFBD9362F33BAD800B7EA3F /* Products */,
 				DFFBD9372F33BAD800B7EA3F /* PluralMac */,
 				AA10000000000000000000A2 /* PluralMacTests */,
+				BB10000000000000000000B2 /* PreferencesShim */,
 			);
 			sourceTree = "<group>";
 		};
@@ -79,6 +118,7 @@
 			children = (
 				DFFBD9352F33BAD800B7EA3F /* PluralMac.app */,
 				AA10000000000000000000A1 /* PluralMacTests.xctest */,
+				BB10000000000000000000B1 /* libPMPPreferences.dylib */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,10 +133,12 @@
 				DFFBD9312F33BAD800B7EA3F /* Sources */,
 				DFFBD9322F33BAD800B7EA3F /* Frameworks */,
 				DFFBD9332F33BAD800B7EA3F /* Resources */,
+				BB10000000000000000000BB /* Embed Libraries */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BB10000000000000000000BA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				DFFBD9372F33BAD800B7EA3F /* PluralMac */,
@@ -131,6 +173,27 @@
 			productReference = AA10000000000000000000A1 /* PluralMacTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		BB10000000000000000000B3 /* PreferencesShim */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB10000000000000000000B6 /* Build configuration list for PBXNativeTarget "PreferencesShim" */;
+			buildPhases = (
+				BB10000000000000000000B4 /* Sources */,
+				BB10000000000000000000B5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BB10000000000000000000B2 /* PreferencesShim */,
+			);
+			name = PreferencesShim;
+			packageProductDependencies = (
+			);
+			productName = PreferencesShim;
+			productReference = BB10000000000000000000B1 /* libPMPPreferences.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -147,6 +210,9 @@
 					AA10000000000000000000A3 = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = DFFBD9342F33BAD800B7EA3F;
+					};
+					BB10000000000000000000B3 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -166,6 +232,7 @@
 			targets = (
 				DFFBD9342F33BAD800B7EA3F /* PluralMac */,
 				AA10000000000000000000A3 /* PluralMacTests */,
+				BB10000000000000000000B3 /* PreferencesShim */,
 			);
 		};
 /* End PBXProject section */
@@ -202,6 +269,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB10000000000000000000B4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -209,6 +283,11 @@
 			isa = PBXTargetDependency;
 			target = DFFBD9342F33BAD800B7EA3F /* PluralMac */;
 			targetProxy = AA10000000000000000000A7 /* PBXContainerItemProxy */;
+		};
+		BB10000000000000000000BA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BB10000000000000000000B3 /* PreferencesShim */;
+			targetProxy = BB10000000000000000000B9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -501,6 +580,42 @@
 			};
 			name = Release;
 		};
+		BB10000000000000000000B7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_HARDENED_RUNTIME = NO;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = PMPPreferences;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		BB10000000000000000000B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_HARDENED_RUNTIME = NO;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = PMPPreferences;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -527,6 +642,15 @@
 			buildConfigurations = (
 				AA10000000000000000000AA /* Debug */,
 				AA10000000000000000000AB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB10000000000000000000B6 /* Build configuration list for PBXNativeTarget "PreferencesShim" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB10000000000000000000B7 /* Debug */,
+				BB10000000000000000000B8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

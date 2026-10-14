@@ -245,6 +245,7 @@ struct InstanceDetailView: View {
     private var dataIsolationSection: some View {
         DetailSection(title: "Data Isolation") {
             DetailRow(label: "Method", value: instance.effectiveIsolationMethod.rawValue.capitalized)
+            preferencesRows
             deviceIDRows
             DetailRow(label: "Data Path", value: instance.dataPath.path)
                 .contextMenu {
@@ -292,6 +293,28 @@ struct InstanceDetailView: View {
     }
     
     // MARK: - Device ID
+    
+    /// Whether the target app blocks injected libraries (Hardened Runtime)
+    private var targetUsesHardenedRuntime: Bool {
+        PreferencesIsolation.usesHardenedRuntime(appAt: instance.targetAppPath)
+    }
+    
+    @ViewBuilder
+    private var preferencesRows: some View {
+        Toggle("Separate preferences", isOn: Binding(
+            get: { instance.separatePreferences == true },
+            set: { enabled in
+                Task { await viewModel.setSeparatePreferences(instance, enabled: enabled) }
+            }
+        ))
+        .disabled(targetUsesHardenedRuntime && instance.separatePreferences != true)
+        
+        Text(targetUsesHardenedRuntime
+             ? "Not available: this app uses Hardened Runtime, which doesn't allow PluralMac Plus to redirect its preferences."
+             : "Keeps the app's settings (UserDefaults) in the data folder instead of sharing them with other instances. Applies after restarting the instance.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
     
     @ViewBuilder
     private var deviceIDRows: some View {

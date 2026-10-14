@@ -57,6 +57,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Hardware UUID reported to the app instead of the Mac's own (nil = real hardware UUID)
     var hardwareIDOverride: UUID?
     
+    /// Keep UserDefaults in the instance folder (true) instead of the shared ~/Library/Preferences
+    var separatePreferences: Bool?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -156,6 +159,12 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         // CFFIXED_USER_HOME makes those follow the data folder as well. UserDefaults are not
         // affected: cfprefsd resolves the preferences folder itself.
         env["CFFIXED_USER_HOME"] = dataPath.path
+        
+        // Redirect UserDefaults into the data folder (cfprefsd ignores HOME and CFFIXED_USER_HOME)
+        if separatePreferences == true {
+            env["DYLD_INSERT_LIBRARIES"] = PreferencesIsolation.installedShimURL.path
+            env[PreferencesIsolation.fileEnvironmentKey] = PreferencesIsolation.preferencesFile(for: self).path
+        }
         
         // Apps that read their device ID from ioreg see a separate hardware UUID
         if let hardwareIDOverride {
@@ -311,6 +320,7 @@ extension AppInstance {
         case launcherPath
         case launcherIconHue
         case hardwareIDOverride
+        case separatePreferences
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon

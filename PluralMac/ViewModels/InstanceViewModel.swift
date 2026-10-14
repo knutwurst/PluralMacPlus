@@ -98,6 +98,13 @@ final class InstanceViewModel {
             handleError(error, context: "loading instances")
         }
         
+        // Launchers and instances load the preferences shim from a stable location
+        do {
+            try PreferencesIsolation.installShim()
+        } catch {
+            logger.error("Installing preferences shim failed: \(error.localizedDescription)")
+        }
+        
         // Instances may still be running from before PluralMac Plus was (re)opened
         await discoverRunningInstances()
         
@@ -157,7 +164,8 @@ final class InstanceViewModel {
         dataPath: URL? = nil,
         launcherFolder: URL? = nil,
         launcherIconHue: Double? = nil,
-        separateHardwareID: Bool = false
+        separateHardwareID: Bool = false,
+        separatePreferences: Bool = false
     ) async throws -> AppInstance {
         logger.info("Creating instance: \(name) for \(application.name)")
         
@@ -173,6 +181,9 @@ final class InstanceViewModel {
         instance.launcherIconHue = launcherIconHue
         if separateHardwareID {
             instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
+        }
+        if separatePreferences && !PreferencesIsolation.usesHardenedRuntime(appAt: application.path) {
+            instance.separatePreferences = true
         }
         
         // No bundle creation needed - we launch directly!
@@ -395,6 +406,26 @@ final class InstanceViewModel {
             try await updateInstance(instance)
         } catch {
             handleError(error, context: context)
+        }
+    }
+    
+    // MARK: - Preferences
+    
+    /// Keep the app's preferences in the instance folder. On first use the instance gets a copy of
+    /// the shared preferences, so nothing is lost. Applies at the next start.
+    func setSeparatePreferences(_ instance: AppInstance, enabled: Bool) async {
+        var updated = instance
+        updated.separatePreferences = enabled ? true : nil
+        updated.touch()
+        
+        do {
+            if enabled {
+                try PreferencesIsolation.installShim()
+                try PreferencesIsolation.seedPreferences(for: updated)
+            }
+            try await updateInstance(updated)
+        } catch {
+            handleError(error, context: "changing preferences isolation")
         }
     }
     

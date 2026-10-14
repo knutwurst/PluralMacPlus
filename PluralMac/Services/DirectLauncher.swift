@@ -57,6 +57,11 @@ actor DirectLauncher {
         // Ensure data directory exists
         try prepareDataDirectory(dataPath: dataPath)
         
+        // The preferences shim must be in place before the app loads it
+        if instance.separatePreferences == true {
+            try PreferencesIsolation.installShim()
+        }
+        
         // Launch using NSWorkspace - use continuation for callback-based API
         let runningApp: NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in

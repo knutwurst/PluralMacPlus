@@ -45,6 +45,7 @@ struct CreateInstanceView: View {
     @State private var launcherFolder = LauncherFolderPicker.applicationsFolder
     @State private var launcherIconHue: Double?
     @State private var separateHardwareID = false
+    @State private var separatePreferences = true
     
     // MARK: - Body
     
@@ -223,6 +224,8 @@ struct CreateInstanceView: View {
                 }
             }
             
+            Toggle("Separate preferences", isOn: $separatePreferences)
+                .disabled(detectedApp.map { PreferencesIsolation.usesHardenedRuntime(appAt: $0.path) } ?? false)
             Toggle("Separate device ID", isOn: $separateHardwareID)
         } header: {
             Text("Data Folder")
@@ -421,7 +424,8 @@ struct CreateInstanceView: View {
                 dataPath: customDataPath,
                 launcherFolder: createLauncher ? launcherFolder : nil,
                 launcherIconHue: launcherIconHue,
-                separateHardwareID: separateHardwareID
+                separateHardwareID: separateHardwareID,
+                separatePreferences: separatePreferences
             )
             dismiss()
         } catch {
