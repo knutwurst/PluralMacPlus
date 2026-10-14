@@ -58,6 +58,12 @@ actor DirectLauncher {
         // Ensure data directory exists
         try prepareDataDirectory(dataPath: dataPath)
         
+        // On FAT/exFAT, companion "._*" files break apps that delete folders on startup
+        if AppleDoubleCleaner.needsCleanup(at: dataPath) {
+            let removed = AppleDoubleCleaner.removeAppleDoubleFiles(in: dataPath)
+            logger.info("Removed \(removed) AppleDouble files before launching \(instanceName)")
+        }
+        
         // The preferences shim must be in place before the app loads it
         if instance.separatePreferences == true {
             try PreferencesIsolation.installShim()

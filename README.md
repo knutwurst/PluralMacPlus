@@ -62,7 +62,7 @@ Sandboxed apps (most of the Mac App Store) and Apple's own apps can't be isolate
 
 Some things are always shared between instances: preferences an app writes outside `UserDefaults.standard` (for example a bundled Sparkle updater's last check time), the Keychain, notification settings, global keyboard shortcuts, the temporary folder under `/var/folders` and macOS's shader caches. If the app updates itself, quit all its instances first, since they all run from the same app bundle.
 
-If your data lives on an exFAT drive, quit the instances before you eject it. exFAT has no journaling and databases can get corrupted.
+If your data lives on an exFAT drive, quit the instances before you eject it. exFAT has no journaling and databases can get corrupted. exFAT also can't store file attributes, so macOS keeps them in hidden `._name` files and deletes those together with the file. Some apps fail when they delete a folder on startup and a `._` file vanishes underneath them; for one app that meant a black window on every second start. PluralMac Plus removes these `._` files from the instance folder before each launch on FAT and exFAT drives. An APFS volume (encrypted, if you like) avoids all of this.
 
 ## Tests
 

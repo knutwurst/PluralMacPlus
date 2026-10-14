@@ -168,7 +168,8 @@ struct LauncherBuilder {
     // MARK: - Script
 
     /// Shell script that starts the instance
-    func script(for instance: AppInstance) -> String {
+    /// - Parameter cleanAppleDouble: remove "._*" files before launch (nil = detect from the data volume)
+    func script(for instance: AppInstance, cleanAppleDouble: Bool? = nil) -> String {
         let q = Self.shellQuote
         var lines = [
             "#!/bin/sh",
@@ -188,6 +189,10 @@ struct LauncherBuilder {
         }
 
         lines.append("/bin/mkdir -p \(q(instance.dataPath.path))")
+        if cleanAppleDouble ?? AppleDoubleCleaner.needsCleanup(at: instance.dataPath) {
+            // FAT/exFAT: companion "._*" files break apps that delete folders on startup
+            lines.append("/usr/bin/find \(q(instance.dataPath.path)) -name '._*' -type f -delete 2>/dev/null")
+        }
         lines.append("")
 
         var command = ["\(instance.privateCopy == nil ? "exec " : "")/usr/bin/open -n -a \(q(instance.launchAppPath.path))"]
