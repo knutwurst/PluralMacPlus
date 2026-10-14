@@ -224,6 +224,23 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(PrivateCopyBuilder.needsRefresh(instance))
     }
 
+    /// macOS caches app icons per bundle and checks the bundle folder's modification date
+    func testBuildingAndUpdatingMarkTheBundleAsChanged() throws {
+        let original = try makeHardenedApp()
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: original.path)
+        var instance = try makeInstance(app: original)
+        let builder = PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones"))
+        let modified = { (url: URL) in try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) }
+
+        instance.privateCopy = try builder.build(for: instance, icon: nil)
+        XCTAssertGreaterThan(try modified(instance.privateCopy!.path), Date().addingTimeInterval(-60))
+
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: instance.privateCopy!.path.path)
+        instance.launcherIconHue = 90
+        instance.privateCopy = try builder.updateIdentity(of: instance, icon: nil)
+        XCTAssertGreaterThan(try modified(instance.privateCopy!.path), Date().addingTimeInterval(-60))
+    }
+
     func testInstanceLaunchesAndMatchesTheCopy() throws {
         let original = try makeHardenedApp()
         var instance = try makeInstance(app: original)

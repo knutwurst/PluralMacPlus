@@ -94,7 +94,7 @@ nonisolated struct PrivateCopyBuilder {
         try signRealBinary(of: copy, original: original)
         try codesign(["--force", "--sign", "-", copy.path])
         try codesign(["--verify", "--deep", "--strict", copy.path])
-        Self.unregisterFromLaunchServices(copy)
+        Self.markChanged(copy)
 
         return PrivateAppCopy(path: copy, originalVersion: Self.versionString(of: original), createdAt: Date())
     }
@@ -115,7 +115,7 @@ nonisolated struct PrivateCopyBuilder {
         try signRealBinary(of: updated.path, original: original)
         try codesign(["--force", "--sign", "-", updated.path.path])
         try codesign(["--verify", "--deep", "--strict", updated.path.path])
-        Self.unregisterFromLaunchServices(updated.path)
+        Self.markChanged(updated.path)
         return updated
     }
 
@@ -228,6 +228,25 @@ nonisolated struct PrivateCopyBuilder {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: lsregisterPath)
         process.arguments = ["-u", copy.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return }
+        process.waitUntilExit()
+    }
+
+    /// macOS caches name and icon per bundle and only rereads them when the bundle folder's
+    /// modification date changes; the clone keeps the original's date, so bump it, let
+    /// LaunchServices reread the bundle once and unregister it again
+    static func markChanged(_ copy: URL) {
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: copy.path)
+        runLsregister(["-f", copy.path])
+        unregisterFromLaunchServices(copy)
+    }
+
+    private static func runLsregister(_ arguments: [String]) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: lsregisterPath)
+        process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         guard (try? process.run()) != nil else { return }
