@@ -101,7 +101,8 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(PreferencesIsolation.allowsLibraryInjection(appAt: copy.path))
         XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
 
-        let entitlements = PreferencesIsolation.entitlements(appAt: copy.path)
+        // The Mach-O keeps the allowed entitlements; the bundle's main executable is the start script
+        let entitlements = PreferencesIsolation.entitlements(appAt: copy.path.appendingPathComponent("Contents/MacOS/Example"))
         XCTAssertEqual(entitlements["com.apple.security.device.camera"] as? Bool, true)
         XCTAssertNil(entitlements["keychain-access-groups"])
         XCTAssertNil(entitlements["com.apple.developer.team-identifier"])
@@ -121,6 +122,51 @@ final class PrivateCopyTests: XCTestCase {
         plist.write(to: plistURL, atomically: true)
 
         XCTAssertTrue(PrivateCopyBuilder.isOutdated(instance))
+    }
+
+    func testCopyStartsThroughScriptThatSetsUpTheInstance() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
+        instance.separatePreferences = true
+
+        let copy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+
+        let plist = try info(copy.path)
+        XCTAssertEqual(plist["CFBundleExecutable"] as? String, PrivateCopyBuilder.startScriptName)
+        XCTAssertEqual(plist[PrivateCopyBuilder.originalExecutableKey] as? String, "Example")
+        let script = try String(contentsOf: copy.path.appendingPathComponent("Contents/MacOS/\(PrivateCopyBuilder.startScriptName)"), encoding: .utf8)
+        XCTAssertTrue(script.hasPrefix("#!/bin/bash\n"))
+        XCTAssertTrue(script.contains("export HOME=\(LauncherBuilder.shellQuote(instance.dataPath.path))"))
+        XCTAssertTrue(script.contains("export DYLD_INSERT_LIBRARIES="))
+        XCTAssertTrue(script.contains("export -f ioreg"))
+        XCTAssertTrue(script.hasSuffix("exec \"${0%/*}/Example\" \"$@\"\n"))
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: copy.path.appendingPathComponent("Contents/MacOS/Example").path))
+        XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
+    }
+
+    /// Runs the start script up to the exec and checks what the real binary would see
+    func testStartScriptHandsEnvironmentAndDeviceIDToTheApp() throws {
+        var instance = try makeInstance(app: try makeHardenedApp())
+        instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
+        let script = LauncherBuilder().copyStartScript(for: instance, executableName: "Example", cleanAppleDouble: false)
+            .replacingOccurrences(of: "exec \"${0%/*}/Example\" \"$@\"", with: "echo \"HOME=$HOME\"; ioreg -l | grep IOPlatformUUID | awk 'NR==1{print $4}' | sed 's/\\\"//g'")
+            .replacingOccurrences(of: PrivateCopyBuilder.lsregisterPath, with: "/usr/bin/true")
+        let file = folder.appendingPathComponent("start.sh")
+        try script.write(to: file, atomically: true, encoding: .utf8)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [file.path]
+        process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        try process.run()
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        process.waitUntilExit()
+
+        XCTAssertTrue(output.contains("HOME=\(instance.dataPath.path)"), output)
+        XCTAssertTrue(output.contains(instance.hardwareIDOverride!.uuidString), output)
     }
 
     func testInstanceLaunchesAndMatchesTheCopy() throws {

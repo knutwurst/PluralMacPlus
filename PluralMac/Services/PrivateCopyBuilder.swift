@@ -39,6 +39,12 @@ nonisolated struct PrivateCopyBuilder {
     /// Icon file the copy uses (without extension, as in CFBundleIconFile)
     static let iconFileName = "PluralMacPlusIcon"
 
+    /// Main executable of the copy: sets up the instance, then execs the app's real binary
+    static let startScriptName = "PluralMacPlusStart"
+
+    /// Info.plist key that remembers the real binary's name
+    static let originalExecutableKey = "PluralMacPlusOriginalExecutable"
+
     /// Entitlements that need an Apple-issued provisioning profile; an ad-hoc signed app carrying
     /// them would be killed at launch
     static let restrictedEntitlementPrefixes = [
@@ -66,7 +72,7 @@ nonisolated struct PrivateCopyBuilder {
     // MARK: - Building
 
     /// Creates (or recreates) the private copy of `original` for an instance
-    func build(instanceID: UUID, name: String, original: URL, iconPNG: Data?) throws -> PrivateAppCopy {
+    func build(instanceID: UUID, name: String, original: URL, iconPNG: Data?, startScript: String) throws -> PrivateAppCopy {
         let folder = clonesDirectory.appendingPathComponent(instanceID.uuidString)
         if FileManager.default.fileExists(atPath: folder.path) {
             try removeItem(folder)
@@ -77,11 +83,13 @@ nonisolated struct PrivateCopyBuilder {
         try cloneBundle(from: original, to: copy)
         try? FileManager.default.removeItem(at: copy.appendingPathComponent("Contents/embedded.provisionprofile"))
 
-        try applyIdentity(to: copy, name: name, iconPNG: iconPNG)
+        try applyIdentity(to: copy, name: name, iconPNG: iconPNG, startScript: startScript)
 
-        // Nested code keeps its own entitlements, then the main bundle gets the filtered ones
+        // Nested code keeps its own entitlements; the real binary gets the filtered ones without
+        // Hardened Runtime; finally the bundle is sealed with the start script as main executable
         try codesign(["--force", "--deep", "--sign", "-", "--preserve-metadata=entitlements", copy.path])
-        try signMainBundle(copy, original: original)
+        try signRealBinary(of: copy, original: original)
+        try codesign(["--force", "--sign", "-", copy.path])
         try codesign(["--verify", "--deep", "--strict", copy.path])
         Self.unregisterFromLaunchServices(copy)
 
@@ -89,7 +97,7 @@ nonisolated struct PrivateCopyBuilder {
     }
 
     /// Applies a new name and icon to an existing copy (no new clone)
-    func updateIdentity(of current: PrivateAppCopy, instanceID: UUID, name: String, original: URL, iconPNG: Data?) throws -> PrivateAppCopy {
+    func updateIdentity(of current: PrivateAppCopy, instanceID: UUID, name: String, original: URL, iconPNG: Data?, startScript: String) throws -> PrivateAppCopy {
         var updated = current
         let renamed = current.path.deletingLastPathComponent()
             .appendingPathComponent("\(AppInstance.sanitizeFileName(name)).app")
@@ -98,8 +106,8 @@ nonisolated struct PrivateCopyBuilder {
             updated.path = renamed
         }
 
-        try applyIdentity(to: updated.path, name: name, iconPNG: iconPNG)
-        try signMainBundle(updated.path, original: original)
+        try applyIdentity(to: updated.path, name: name, iconPNG: iconPNG, startScript: startScript)
+        try codesign(["--force", "--sign", "-", updated.path.path])
         try codesign(["--verify", "--deep", "--strict", updated.path.path])
         Self.unregisterFromLaunchServices(updated.path)
         return updated
@@ -115,7 +123,7 @@ nonisolated struct PrivateCopyBuilder {
         }
     }
 
-    private func applyIdentity(to copy: URL, name: String, iconPNG: Data?) throws {
+    private func applyIdentity(to copy: URL, name: String, iconPNG: Data?, startScript: String) throws {
         let contents = copy.appendingPathComponent("Contents")
         let infoURL = contents.appendingPathComponent("Info.plist")
         guard let info = NSMutableDictionary(contentsOf: infoURL) else {
@@ -127,6 +135,14 @@ nonisolated struct PrivateCopyBuilder {
         // A bundled Sparkle updater must not patch the copy
         info["SUEnableAutomaticChecks"] = false
         info["SUAutomaticallyUpdate"] = false
+
+        // The start script becomes the main executable; the real binary keeps its name
+        let executable = info[Self.originalExecutableKey] as? String ?? info["CFBundleExecutable"] as? String ?? ""
+        info[Self.originalExecutableKey] = executable
+        info["CFBundleExecutable"] = Self.startScriptName
+        let scriptURL = contents.appendingPathComponent("MacOS/\(Self.startScriptName)")
+        try startScript.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
 
         if let iconPNG, Self.writeIcon(iconPNG, to: contents.appendingPathComponent("Resources/\(Self.iconFileName).icns")) {
             info.removeObject(forKey: "CFBundleIconName")
@@ -152,7 +168,10 @@ nonisolated struct PrivateCopyBuilder {
         }
     }
 
-    private func signMainBundle(_ copy: URL, original: URL) throws {
+    private func signRealBinary(of copy: URL, original: URL) throws {
+        let info = NSDictionary(contentsOf: copy.appendingPathComponent("Contents/Info.plist"))
+        let executable = info?[Self.originalExecutableKey] as? String ?? ""
+        let binary = copy.appendingPathComponent("Contents/MacOS/\(executable)")
         let entitlements = Self.filteredEntitlements(PreferencesIsolation.entitlements(appAt: original))
         var arguments = ["--force", "--sign", "-"]
         if !entitlements.isEmpty {
@@ -160,9 +179,9 @@ nonisolated struct PrivateCopyBuilder {
             try PropertyListSerialization.data(fromPropertyList: entitlements, format: .xml, options: 0).write(to: file)
             defer { try? FileManager.default.removeItem(at: file) }
             arguments += ["--entitlements", file.path]
-            try codesign(arguments + [copy.path])
+            try codesign(arguments + [binary.path])
         } else {
-            try codesign(arguments + [copy.path])
+            try codesign(arguments + [binary.path])
         }
     }
 
@@ -244,12 +263,28 @@ nonisolated struct PrivateCopyBuilder {
 extension PrivateCopyBuilder {
 
     func build(for instance: AppInstance, icon: NSImage?) throws -> PrivateAppCopy {
-        try build(instanceID: instance.id, name: instance.name, original: instance.targetAppPath, iconPNG: icon.flatMap(Self.pngData))
+        try build(instanceID: instance.id, name: instance.name, original: instance.targetAppPath,
+                  iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: instance))
     }
 
     func updateIdentity(of instance: AppInstance, icon: NSImage?) throws -> PrivateAppCopy? {
         guard let current = instance.privateCopy else { return nil }
-        return try updateIdentity(of: current, instanceID: instance.id, name: instance.name, original: instance.targetAppPath, iconPNG: icon.flatMap(Self.pngData))
+        return try updateIdentity(of: current, instanceID: instance.id, name: instance.name, original: instance.targetAppPath,
+                                  iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: instance))
+    }
+
+    /// Start script for the instance's copy, calling the original app's binary
+    static func startScript(for instance: AppInstance) -> String {
+        let info = NSDictionary(contentsOf: instance.targetAppPath.appendingPathComponent("Contents/Info.plist"))
+        let executable = info?["CFBundleExecutable"] as? String ?? ""
+        return LauncherBuilder().copyStartScript(for: instance, executableName: executable)
+    }
+
+    /// Whether the copy's start script no longer matches the instance (settings changed)
+    static func isStartScriptOutdated(_ instance: AppInstance) -> Bool {
+        guard let copy = instance.privateCopy else { return false }
+        let script = try? String(contentsOf: copy.path.appendingPathComponent("Contents/MacOS/\(startScriptName)"), encoding: .utf8)
+        return script != startScript(for: instance)
     }
 
     /// Whether the original app changed since the copy was made

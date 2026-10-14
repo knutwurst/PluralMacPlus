@@ -115,6 +115,21 @@ final class InstanceViewModel {
         await discoverRunningInstances()
         
         await refreshOutdatedLaunchers()
+        await refreshOutdatedPrivateCopies()
+    }
+    
+    /// Give private copies made by an earlier version (or with stale settings) a current start script
+    private func refreshOutdatedPrivateCopies() async {
+        for instance in instances where PrivateCopyBuilder.isStartScriptOutdated(instance) {
+            var updated = instance
+            do {
+                try await refreshPrivateCopyIdentityIfIdle(&updated)
+                try await persist(updated)
+                logger.info("Updated private copy of \(instance.name)")
+            } catch {
+                logger.error("Updating private copy of \(instance.name) failed: \(error.localizedDescription)")
+            }
+        }
     }
     
     /// Rebuild launcher apps whose script no longer matches the instance (e.g. after an app update)
@@ -213,8 +228,11 @@ final class InstanceViewModel {
     func updateInstance(_ instance: AppInstance) async throws {
         logger.info("Updating instance: \(instance.name)")
         
-        // Keep an existing launcher app in sync (name, data folder, arguments)
+        // Keep an existing launcher app and private copy in sync (name, data folder, arguments)
         var instance = instance
+        if PrivateCopyBuilder.isStartScriptOutdated(instance) {
+            try await refreshPrivateCopyIdentityIfIdle(&instance)
+        }
         if instance.launcherPath != nil {
             instance.launcherPath = await refreshedLauncher(for: instance)
         }
@@ -375,11 +393,12 @@ final class InstanceViewModel {
         
         let id = instance.id, name = instance.name, original = instance.targetAppPath
         let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
+        let startScript = PrivateCopyBuilder.startScript(for: instance)
         
         do {
             // Copying and signing a large app takes a while; keep the UI responsive
             let copy = try await Task.detached {
-                try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon)
+                try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon, startScript: startScript)
             }.value
             
             var updated = instances.first { $0.id == instance.id } ?? instance
@@ -418,14 +437,16 @@ final class InstanceViewModel {
         }
     }
     
-    /// Apply name and icon to the copy unless the instance is running (then it happens before the next launch)
+    /// Apply name, icon and start script to the copy unless the instance is running (then it
+    /// happens before the next launch)
     private func refreshPrivateCopyIdentityIfIdle(_ instance: inout AppInstance) async throws {
         guard let current = instance.privateCopy, !(await directLauncher.isRunning(instance.id)) else { return }
         
         let id = instance.id, name = instance.name, original = instance.targetAppPath
         let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
+        let startScript = PrivateCopyBuilder.startScript(for: instance)
         instance.privateCopy = try await Task.detached {
-            try PrivateCopyBuilder().updateIdentity(of: current, instanceID: id, name: name, original: original, iconPNG: icon)
+            try PrivateCopyBuilder().updateIdentity(of: current, instanceID: id, name: name, original: original, iconPNG: icon, startScript: startScript)
         }.value
     }
     
@@ -583,7 +604,8 @@ final class InstanceViewModel {
         // A rename or icon change while the instance ran is applied to the copy now
         var instance = instance
         if let copy = instance.privateCopy,
-           (NSDictionary(contentsOf: copy.path.appendingPathComponent("Contents/Info.plist"))?["CFBundleName"] as? String) != instance.name {
+           (NSDictionary(contentsOf: copy.path.appendingPathComponent("Contents/Info.plist"))?["CFBundleName"] as? String) != instance.name
+            || PrivateCopyBuilder.isStartScriptOutdated(instance) {
             try await refreshPrivateCopyIdentityIfIdle(&instance)
             try await updateInstance(instance)
         }
