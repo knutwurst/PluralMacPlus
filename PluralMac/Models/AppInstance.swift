@@ -152,8 +152,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         // This ensures apps that hardcode paths still work
         env["HOME"] = dataPath.path
         
-        // Foundation ignores HOME (NSHomeDirectory, Caches, Application Support, HTTPStorages,
-        // preferences); CFFIXED_USER_HOME makes those follow the data folder as well
+        // Foundation ignores HOME (NSHomeDirectory, Caches, Application Support, HTTPStorages);
+        // CFFIXED_USER_HOME makes those follow the data folder as well. UserDefaults are not
+        // affected: cfprefsd resolves the preferences folder itself.
         env["CFFIXED_USER_HOME"] = dataPath.path
         
         // Apps that read their device ID from ioreg see a separate hardware UUID

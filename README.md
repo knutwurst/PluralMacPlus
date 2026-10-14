@@ -12,7 +12,9 @@ Launcher apps. For each instance you can create a small app named after it, by d
 
 Data folders. You pick the data folder when you create an instance. If the folder already contains a profile, PluralMac Plus asks whether to use it or pick a different one. Settings → Storage sets the default location, and "Move Data Folder…" relocates an existing instance. If the data sits on a drive that isn't connected, the instance won't start, so you don't end up with an empty profile by accident.
 
-Better isolation. The original only set `HOME`, which macOS's own path functions ignore. Caches, Application Support, HTTPStorages and preferences of many apps ended up in the real home folder and were shared between instances. I now also set `CFFIXED_USER_HOME`, which fixes that.
+Better isolation. The original only set `HOME`, which macOS's own path functions ignore. Caches, Application Support and HTTPStorages of many apps ended up in the real home folder and were shared between instances. I now also set `CFFIXED_USER_HOME`, which fixes that. Preferences stored through `UserDefaults` stay shared: the system's preferences daemon picks the folder itself, and I haven't found a way around it.
+
+Separate device ID. Some apps identify the Mac by its hardware UUID, so two instances look like the same device to the app's server. In my case incoming messages only reached one of them. Turn on "Separate device ID" for an instance and it sees its own UUID; "New Device ID…" hands out a fresh one. It works for apps that ask `ioreg` through the shell, which covers the Flutter plugins I've looked at.
 
 Running instances. Double-click an instance to start it, or to bring it to the front and restore a minimized window if it's already running. After restarting PluralMac Plus it still knows which instances are running, including ones started through a launcher.
 
@@ -56,7 +58,7 @@ Chromium browsers, VS Code, Cursor, Slack, Firefox and Spotify work through thei
 
 Sandboxed apps (most of the Mac App Store) and Apple's own apps can't be isolated. Neither can apps that hardcode their data paths. Discord runs in several windows but with one shared account.
 
-Some things are always shared between instances: the Keychain, the temporary folder under `/var/folders` and macOS's shader caches.
+Some things are always shared between instances: preferences stored through `UserDefaults`, the Keychain, notification settings, global keyboard shortcuts, the temporary folder under `/var/folders` and macOS's shader caches. If the app updates itself, quit all its instances first, since they all run from the same app bundle.
 
 If your data lives on an exFAT drive, quit the instances before you eject it. exFAT has no journaling and databases can get corrupted.
 
