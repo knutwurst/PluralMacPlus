@@ -169,6 +169,44 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(output.contains(instance.hardwareIDOverride!.uuidString), output)
     }
 
+    /// Copies made before the start script had the real binary as main executable, so its
+    /// signature is bound to Info.plist; updating them must re-sign that binary
+    func testUpdatingCopyFromEarlierVersionKeepsValidSignature() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        let builder = PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones"))
+        instance.privateCopy = try builder.build(for: instance, icon: nil)
+
+        // Turn it into an old-style copy: real binary as main executable, signed as the bundle
+        let copy = try XCTUnwrap(instance.privateCopy).path
+        let plistURL = copy.appendingPathComponent("Contents/Info.plist")
+        let plist = try XCTUnwrap(NSMutableDictionary(contentsOf: plistURL))
+        plist["CFBundleExecutable"] = "Example"
+        plist.removeObject(forKey: PrivateCopyBuilder.originalExecutableKey)
+        plist.write(to: plistURL, atomically: true)
+        try FileManager.default.removeItem(at: copy.appendingPathComponent("Contents/MacOS/\(PrivateCopyBuilder.startScriptName)"))
+        XCTAssertEqual(try run("/usr/bin/codesign", ["--force", "--sign", "-", copy.path]), 0)
+
+        instance.privateCopy = try builder.updateIdentity(of: instance, icon: nil)
+
+        XCTAssertEqual(try info(copy)["CFBundleExecutable"] as? String, PrivateCopyBuilder.startScriptName)
+        XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path]), 0)
+    }
+
+    func testDetectsBrokenCopySignature() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        instance.privateCopy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+        XCTAssertTrue(PrivateCopyBuilder.isSignatureValid(instance.privateCopy!.path))
+
+        let plistURL = instance.privateCopy!.path.appendingPathComponent("Contents/Info.plist")
+        let plist = try XCTUnwrap(NSMutableDictionary(contentsOf: plistURL))
+        plist["CFBundleName"] = "tampered"
+        plist.write(to: plistURL, atomically: true)
+
+        XCTAssertFalse(PrivateCopyBuilder.isSignatureValid(instance.privateCopy!.path))
+    }
+
     func testInstanceLaunchesAndMatchesTheCopy() throws {
         let original = try makeHardenedApp()
         var instance = try makeInstance(app: original)
@@ -196,5 +234,12 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertEqual(copy.path.lastPathComponent, "Second Profile.app")
         XCTAssertEqual(try info(copy.path)["CFBundleName"] as? String, "Second Profile")
         XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
+    }
+}
+
+final class TestHostIsolationTests: XCTestCase {
+    /// The test host is PluralMac Plus itself; it must never load (and modify) the user's instances
+    func testTestHostIsDetected() {
+        XCTAssertTrue(AppEnvironment.isRunningTests)
     }
 }

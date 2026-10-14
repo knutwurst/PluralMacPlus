@@ -75,6 +75,13 @@ final class InstanceViewModel {
     // MARK: - Initialization
     
     init() {
+        // A private copy can only be updated while its instance is not running
+        NotificationCenter.default.addObserver(forName: .instanceTerminated, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refreshOutdatedPrivateCopies()
+            }
+        }
+        
         // Pick up instances started by launcher apps while PluralMac Plus is open
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
@@ -91,6 +98,9 @@ final class InstanceViewModel {
     
     /// Load instances from storage
     func loadInstances() async {
+        // Never touch the user's real instances from the unit test host
+        guard !AppEnvironment.isRunningTests else { return }
+        
         isLoading = true
         defer { isLoading = false }
         
@@ -118,9 +128,13 @@ final class InstanceViewModel {
         await refreshOutdatedPrivateCopies()
     }
     
-    /// Give private copies made by an earlier version (or with stale settings) a current start script
-    private func refreshOutdatedPrivateCopies() async {
-        for instance in instances where PrivateCopyBuilder.isStartScriptOutdated(instance) {
+    /// Give private copies made by an earlier version (or with stale settings or a broken signature)
+    /// a current start script; running instances are skipped and handled when they quit
+    func refreshOutdatedPrivateCopies() async {
+        guard !AppEnvironment.isRunningTests else { return }
+        for instance in instances where PrivateCopyBuilder.isStartScriptOutdated(instance)
+            || instance.privateCopy.map({ !PrivateCopyBuilder.isSignatureValid($0.path) }) == true {
+            guard !(await directLauncher.isRunning(instance.id)) else { continue }
             var updated = instance
             do {
                 try await refreshPrivateCopyIdentityIfIdle(&updated)

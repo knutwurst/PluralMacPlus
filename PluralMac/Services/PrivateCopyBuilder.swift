@@ -107,6 +107,9 @@ nonisolated struct PrivateCopyBuilder {
         }
 
         try applyIdentity(to: updated.path, name: name, iconPNG: iconPNG, startScript: startScript)
+        // The real binary of a copy from an earlier version was signed as main executable and is
+        // bound to the old Info.plist; sign it on its own before sealing the bundle again
+        try signRealBinary(of: updated.path, original: original)
         try codesign(["--force", "--sign", "-", updated.path.path])
         try codesign(["--verify", "--deep", "--strict", updated.path.path])
         Self.unregisterFromLaunchServices(updated.path)
@@ -278,6 +281,18 @@ extension PrivateCopyBuilder {
         let info = NSDictionary(contentsOf: instance.targetAppPath.appendingPathComponent("Contents/Info.plist"))
         let executable = info?["CFBundleExecutable"] as? String ?? ""
         return LauncherBuilder().copyStartScript(for: instance, executableName: executable)
+    }
+
+    /// Whether the copy's code signature verifies (a broken one keeps macOS from starting it)
+    static func isSignatureValid(_ copy: URL) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = ["--verify", "--deep", "--strict", copy.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0
     }
 
     /// Whether the copy's start script no longer matches the instance (settings changed)
