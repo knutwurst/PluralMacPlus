@@ -182,7 +182,7 @@ final class InstanceViewModel {
         if separateHardwareID {
             instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
         }
-        if separatePreferences && !PreferencesIsolation.usesHardenedRuntime(appAt: application.path) {
+        if separatePreferences && PreferencesIsolation.allowsLibraryInjection(appAt: application.path) {
             instance.separatePreferences = true
         }
         

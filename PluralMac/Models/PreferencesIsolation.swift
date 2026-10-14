@@ -59,18 +59,34 @@ nonisolated enum PreferencesIsolation {
         try bundledData.write(to: target, options: .atomic)
     }
 
-    /// Whether the app at `url` runs with Hardened Runtime, which blocks DYLD_INSERT_LIBRARIES
+    /// Whether the app at `url` runs with Hardened Runtime
     static func usesHardenedRuntime(appAt url: URL) -> Bool {
-        var staticCode: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode) == errSecSuccess, let staticCode else {
-            return false
-        }
-        var information: CFDictionary?
-        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
-              let flags = (information as? [String: Any])?[kSecCodeInfoFlags as String] as? UInt32 else {
+        guard let flags = signingInformation(appAt: url)?[kSecCodeInfoFlags as String] as? UInt32 else {
             return false
         }
         return flags & SecCodeSignatureFlags.runtime.rawValue != 0
+    }
+
+    /// Whether macOS lets the shim be injected: either no Hardened Runtime, or the app opts in to
+    /// DYLD environment variables and loading libraries signed by others
+    static func allowsLibraryInjection(appAt url: URL) -> Bool {
+        guard usesHardenedRuntime(appAt: url) else { return true }
+
+        let entitlements = signingInformation(appAt: url)?[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
+        return entitlements["com.apple.security.cs.allow-dyld-environment-variables"] as? Bool == true
+            && entitlements["com.apple.security.cs.disable-library-validation"] as? Bool == true
+    }
+
+    private static func signingInformation(appAt url: URL) -> [String: Any]? {
+        var staticCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode) == errSecSuccess, let staticCode else {
+            return nil
+        }
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation | kSecCSRequirementInformation), &information) == errSecSuccess else {
+            return nil
+        }
+        return information as? [String: Any]
     }
 }
 

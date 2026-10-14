@@ -225,7 +225,7 @@ struct CreateInstanceView: View {
             }
             
             Toggle("Separate preferences", isOn: $separatePreferences)
-                .disabled(detectedApp.map { PreferencesIsolation.usesHardenedRuntime(appAt: $0.path) } ?? false)
+                .disabled(detectedApp.map { !PreferencesIsolation.allowsLibraryInjection(appAt: $0.path) } ?? false)
             Toggle("Separate device ID", isOn: $separateHardwareID)
         } header: {
             Text("Data Folder")

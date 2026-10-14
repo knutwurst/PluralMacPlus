@@ -294,9 +294,9 @@ struct InstanceDetailView: View {
     
     // MARK: - Device ID
     
-    /// Whether the target app blocks injected libraries (Hardened Runtime)
-    private var targetUsesHardenedRuntime: Bool {
-        PreferencesIsolation.usesHardenedRuntime(appAt: instance.targetAppPath)
+    /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
+    private var targetBlocksInjection: Bool {
+        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.targetAppPath)
     }
     
     @ViewBuilder
@@ -307,10 +307,10 @@ struct InstanceDetailView: View {
                 Task { await viewModel.setSeparatePreferences(instance, enabled: enabled) }
             }
         ))
-        .disabled(targetUsesHardenedRuntime && instance.separatePreferences != true)
+        .disabled(targetBlocksInjection && instance.separatePreferences != true)
         
-        Text(targetUsesHardenedRuntime
-             ? "Not available: this app uses Hardened Runtime, which doesn't allow PluralMac Plus to redirect its preferences."
+        Text(targetBlocksInjection
+             ? "Not available: this app uses Hardened Runtime and doesn't allow PluralMac Plus to redirect its preferences. Chromium and Electron apps keep their real settings in the profile folder, which is separated anyway."
              : "Keeps the app's settings (UserDefaults) in the data folder instead of sharing them with other instances. Applies after restarting the instance.")
             .font(.caption)
             .foregroundStyle(.secondary)

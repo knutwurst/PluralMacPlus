@@ -64,18 +64,61 @@ final class PreferencesIsolationTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "own")
     }
 
+    func testUnhardenedAppAllowsInjection() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let app = try copyFakeApp(to: folder.appendingPathComponent("Plain.app"))
+        try codesign(app, hardened: false)
+        XCTAssertTrue(PreferencesIsolation.allowsLibraryInjection(appAt: app))
+    }
+
+    func testHardenedAppBlocksInjection() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let app = try copyFakeApp(to: folder.appendingPathComponent("Hardened.app"))
+        try codesign(app, hardened: true)
+        XCTAssertFalse(PreferencesIsolation.allowsLibraryInjection(appAt: app))
+    }
+
+    func testHardenedAppWithDyldEntitlementsAllowsInjection() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let app = try copyFakeApp(to: folder.appendingPathComponent("Allowed.app"))
+        try codesign(app, hardened: true, entitlements: [
+            "com.apple.security.cs.allow-dyld-environment-variables": true,
+            "com.apple.security.cs.disable-library-validation": true,
+        ], in: folder)
+        XCTAssertTrue(PreferencesIsolation.allowsLibraryInjection(appAt: app))
+    }
+
+    func testHardenedAppWithOnlyDyldEntitlementBlocksInjection() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let app = try copyFakeApp(to: folder.appendingPathComponent("HalfAllowed.app"))
+        try codesign(app, hardened: true, entitlements: [
+            "com.apple.security.cs.allow-dyld-environment-variables": true,
+        ], in: folder)
+        XCTAssertFalse(PreferencesIsolation.allowsLibraryInjection(appAt: app))
+    }
+
     // MARK: - Helpers
 
+    /// Copy of the fake app with a real Mach-O executable, so codesign can embed entitlements
     private func copyFakeApp(to destination: URL) throws -> URL {
         let source = makeTestApplication().path
         try FileManager.default.copyItem(at: source, to: destination)
+        let executable = destination.appendingPathComponent("Contents/MacOS/ExampleApp")
+        try FileManager.default.removeItem(at: executable)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: executable)
         return destination
     }
 
-    private func codesign(_ app: URL, hardened: Bool) throws {
+    private func codesign(_ app: URL, hardened: Bool, entitlements: [String: Any]? = nil, in folder: URL? = nil) throws {
+        var arguments = ["--sign", "-", "--force"] + (hardened ? ["--options", "runtime"] : [])
+        if let entitlements, let folder {
+            let file = folder.appendingPathComponent("entitlements-\(UUID().uuidString).plist")
+            try PropertyListSerialization.data(fromPropertyList: entitlements, format: .xml, options: 0).write(to: file)
+            arguments += ["--entitlements", file.path]
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        process.arguments = ["--sign", "-", "--force"] + (hardened ? ["--options", "runtime"] : []) + [app.path]
+        process.arguments = arguments + [app.path]
         process.standardError = FileHandle.nullDevice
         try process.run()
         process.waitUntilExit()
