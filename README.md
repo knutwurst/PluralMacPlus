@@ -14,7 +14,7 @@ Data folders. You pick the data folder when you create an instance. If the folde
 
 Better isolation. The original only set `HOME`, which macOS's own path functions ignore. Caches, Application Support and HTTPStorages of many apps ended up in the real home folder and were shared between instances. I now also set `CFFIXED_USER_HOME`, which fixes that. Preferences stored through `UserDefaults` stay shared: the system's preferences daemon picks the folder itself, and I haven't found a way around it.
 
-Separate device ID. Some apps identify the Mac by its hardware UUID, so two instances look like the same device to the app's server. In my case incoming messages only reached one of them. Turn on "Separate device ID" for an instance and it sees its own UUID; "New Device ID…" hands out a fresh one. It works for apps that ask `ioreg` through the shell, which covers the Flutter plugins I've looked at.
+Separate device ID. Some apps identify the Mac by its hardware UUID, so two instances look like the same device to the app's server. The server then only talks to one of them. Turn on "Separate device ID" for an instance and it sees its own UUID; "New Device ID…" hands out a fresh one. It works for apps that ask `ioreg` through the shell, which covers the Flutter plugins I've looked at.
 
 Running instances. Double-click an instance to start it, or to bring it to the front and restore a minimized window if it's already running. After restarting PluralMac Plus it still knows which instances are running, including ones started through a launcher.
 
