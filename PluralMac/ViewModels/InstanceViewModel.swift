@@ -156,7 +156,8 @@ final class InstanceViewModel {
         customIconPath: URL? = nil,
         dataPath: URL? = nil,
         launcherFolder: URL? = nil,
-        launcherIconHue: Double? = nil
+        launcherIconHue: Double? = nil,
+        separateHardwareID: Bool = false
     ) async throws -> AppInstance {
         logger.info("Creating instance: \(name) for \(application.name)")
         
@@ -170,6 +171,9 @@ final class InstanceViewModel {
         instance.commandLineArguments = arguments
         instance.customIconPath = customIconPath
         instance.launcherIconHue = launcherIconHue
+        if separateHardwareID {
+            instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
+        }
         
         // No bundle creation needed - we launch directly!
         // Just save to storage
@@ -365,6 +369,32 @@ final class InstanceViewModel {
             logger.info("Moved data folder of \(instance.name) to \(destination.path)")
         } catch {
             handleError(error, context: "moving data folder")
+        }
+    }
+    
+    // MARK: - Hardware ID
+    
+    /// Report a separate hardware UUID to the app (or the real one again). Applies at the next start.
+    func setSeparateHardwareID(_ instance: AppInstance, enabled: Bool) async {
+        var updated = instance
+        updated.hardwareIDOverride = enabled ? HardwareIdentity.separateID(for: instance.id) : nil
+        updated.touch()
+        await save(updated, context: "changing device ID")
+    }
+    
+    /// Give the instance a new random hardware UUID. Applies at the next start.
+    func regenerateHardwareID(_ instance: AppInstance) async {
+        var updated = instance
+        updated.hardwareIDOverride = UUID()
+        updated.touch()
+        await save(updated, context: "changing device ID")
+    }
+    
+    private func save(_ instance: AppInstance, context: String) async {
+        do {
+            try await updateInstance(instance)
+        } catch {
+            handleError(error, context: context)
         }
     }
     

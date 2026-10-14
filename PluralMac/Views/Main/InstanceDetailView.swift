@@ -28,6 +28,7 @@ struct InstanceDetailView: View {
     @State private var duplicateName: String = ""
     @State private var launcherIconHue: Double?
     @State private var showLaunchOptionsEditor = false
+    @State private var confirmNewDeviceID = false
     @State private var editedEnvironment: [String: String] = [:]
     @State private var editedArguments: [String] = []
     
@@ -244,6 +245,7 @@ struct InstanceDetailView: View {
     private var dataIsolationSection: some View {
         DetailSection(title: "Data Isolation") {
             DetailRow(label: "Method", value: instance.effectiveIsolationMethod.rawValue.capitalized)
+            deviceIDRows
             DetailRow(label: "Data Path", value: instance.dataPath.path)
                 .contextMenu {
                     Button("Copy Path") {
@@ -287,6 +289,45 @@ struct InstanceDetailView: View {
                     }
                 }
         }
+    }
+    
+    // MARK: - Device ID
+    
+    @ViewBuilder
+    private var deviceIDRows: some View {
+        Toggle("Separate device ID", isOn: Binding(
+            get: { instance.hardwareIDOverride != nil },
+            set: { enabled in
+                Task { await viewModel.setSeparateHardwareID(instance, enabled: enabled) }
+            }
+        ))
+        
+        if let deviceID = instance.hardwareIDOverride {
+            DetailRow(label: "Device ID", value: deviceID.uuidString)
+                .contextMenu {
+                    Button("Copy Device ID") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(deviceID.uuidString, forType: .string)
+                    }
+                }
+            Button("New Device ID...") {
+                confirmNewDeviceID = true
+            }
+            .confirmationDialog("Create a new device ID?", isPresented: $confirmNewDeviceID, titleVisibility: .visible) {
+                Button("Create New Device ID") {
+                    Task { await viewModel.regenerateHardwareID(instance) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The app will see a different device the next time it starts. You may have to sign in or confirm the device again.")
+            }
+        }
+        
+        Text(isRunning
+             ? "Reports its own hardware ID to apps that identify the Mac that way. Changes apply after restarting the instance."
+             : "Reports its own hardware ID to apps that identify the Mac that way, so several instances don't count as the same device.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
     
     // MARK: - Launcher Section

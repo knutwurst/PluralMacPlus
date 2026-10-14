@@ -44,6 +44,7 @@ struct CreateInstanceView: View {
     @State private var createLauncher = true
     @State private var launcherFolder = LauncherFolderPicker.applicationsFolder
     @State private var launcherIconHue: Double?
+    @State private var separateHardwareID = false
     
     // MARK: - Body
     
@@ -221,10 +222,12 @@ struct CreateInstanceView: View {
                     chooseDataFolder()
                 }
             }
+            
+            Toggle("Separate device ID", isOn: $separateHardwareID)
         } header: {
             Text("Data Folder")
         } footer: {
-            Text("Where this instance stores its profile, cache and login. Choose a folder that already contains data to reuse it.")
+            Text("Where this instance stores its profile, cache and login. Choose a folder that already contains data to reuse it. Turn on \"Separate device ID\" if the app identifies your Mac by its hardware ID and several instances interfere with each other.")
         }
     }
     
@@ -417,7 +420,8 @@ struct CreateInstanceView: View {
                 customIconPath: customIconPath,
                 dataPath: customDataPath,
                 launcherFolder: createLauncher ? launcherFolder : nil,
-                launcherIconHue: launcherIconHue
+                launcherIconHue: launcherIconHue,
+                separateHardwareID: separateHardwareID
             )
             dismiss()
         } catch {

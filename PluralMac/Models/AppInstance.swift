@@ -54,6 +54,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Hue rotation in degrees applied to the launcher icon (nil = original colors)
     var launcherIconHue: Double?
     
+    /// Hardware UUID reported to the app instead of the Mac's own (nil = real hardware UUID)
+    var hardwareIDOverride: UUID?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -112,6 +115,7 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         self.customIconPath = nil
         self.launcherPath = nil
         self.launcherIconHue = nil
+        self.hardwareIDOverride = nil
         self.isolationMethodOverride = nil
         self.eraseDataOnQuit = false
         self.showMenuBarIcon = false
@@ -151,6 +155,11 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         // Foundation ignores HOME (NSHomeDirectory, Caches, Application Support, HTTPStorages,
         // preferences); CFFIXED_USER_HOME makes those follow the data folder as well
         env["CFFIXED_USER_HOME"] = dataPath.path
+        
+        // Apps that read their device ID from ioreg see a separate hardware UUID
+        if let hardwareIDOverride {
+            env[HardwareIdentity.environmentKey] = HardwareIdentity.ioregFunction(reporting: hardwareIDOverride)
+        }
         
         // Also set XDG directories for apps that use them
         env["XDG_CONFIG_HOME"] = dataPath.appendingPathComponent(".config").path
@@ -300,6 +309,7 @@ extension AppInstance {
         case customIconPath
         case launcherPath
         case launcherIconHue
+        case hardwareIDOverride
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon
