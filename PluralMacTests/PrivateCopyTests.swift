@@ -1,0 +1,154 @@
+import XCTest
+import AppKit
+@testable import PluralMac
+
+final class PrivateCopyTests: XCTestCase {
+
+    private var folder: URL!
+
+    override func setUpWithError() throws {
+        folder = try makeTemporaryDirectory(self)
+    }
+
+    /// Hardened fake app with a real Mach-O, restricted and normal entitlements, a provisioning
+    /// profile, an asset-catalog icon name and a localized bundle name
+    private func makeHardenedApp(version: String = "4.0.6") throws -> URL {
+        let app = folder.appendingPathComponent("Example.app")
+        let contents = app.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents.appendingPathComponent("MacOS"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: contents.appendingPathComponent("Resources/en.lproj"), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: contents.appendingPathComponent("MacOS/Example"))
+
+        let info: [String: Any] = [
+            "CFBundleIdentifier": "com.example.hardened",
+            "CFBundleExecutable": "Example",
+            "CFBundlePackageType": "APPL",
+            "CFBundleName": "Example",
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": "1",
+            "CFBundleIconName": "AppIcon",
+        ]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: contents.appendingPathComponent("Info.plist"))
+        try Data("\"CFBundleName\" = \"Beispiel\";\n\"NSHumanReadableCopyright\" = \"x\";\n".utf8)
+            .write(to: contents.appendingPathComponent("Resources/en.lproj/InfoPlist.strings"))
+        try Data("profile".utf8).write(to: contents.appendingPathComponent("embedded.provisionprofile"))
+
+        let entitlements: [String: Any] = [
+            "com.apple.security.device.camera": true,
+            "keychain-access-groups": ["TEAM.com.example"],
+            "com.apple.developer.team-identifier": "TEAM",
+            "com.apple.application-identifier": "TEAM.com.example.hardened",
+        ]
+        let entitlementsFile = folder.appendingPathComponent("entitlements.plist")
+        try PropertyListSerialization.data(fromPropertyList: entitlements, format: .xml, options: 0).write(to: entitlementsFile)
+        try run("/usr/bin/codesign", ["--sign", "-", "--force", "--options", "runtime", "--entitlements", entitlementsFile.path, app.path])
+        return app
+    }
+
+    private func makeInstance(app: URL) throws -> AppInstance {
+        AppInstance(name: "Work Profile", application: try Application(from: app), dataPath: folder.appendingPathComponent("data"))
+    }
+
+    @discardableResult
+    private func run(_ tool: String, _ arguments: [String]) throws -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tool)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
+    private func info(_ app: URL) throws -> [String: Any] {
+        try XCTUnwrap(NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) as? [String: Any])
+    }
+
+    // MARK: - Tests
+
+    func testCopyCarriesInstanceNameAndOwnIcon() throws {
+        let original = try makeHardenedApp()
+        let instance = try makeInstance(app: original)
+
+        let copy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones"))
+            .build(for: instance, icon: NSWorkspace.shared.icon(forFile: original.path))
+
+        XCTAssertEqual(copy.path.lastPathComponent, "Work Profile.app")
+        let plist = try info(copy.path)
+        XCTAssertEqual(plist["CFBundleName"] as? String, "Work Profile")
+        XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "Work Profile")
+        XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "com.example.hardened")
+        XCTAssertNil(plist["CFBundleIconName"])
+        XCTAssertEqual(plist["CFBundleIconFile"] as? String, PrivateCopyBuilder.iconFileName)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: copy.path.appendingPathComponent("Contents/Resources/\(PrivateCopyBuilder.iconFileName).icns").path))
+        XCTAssertEqual(plist["SUEnableAutomaticChecks"] as? Bool, false)
+
+        let strings = try String(contentsOf: copy.path.appendingPathComponent("Contents/Resources/en.lproj/InfoPlist.strings"), encoding: .utf8)
+        XCTAssertFalse(strings.contains("CFBundleName"))
+        XCTAssertTrue(strings.contains("NSHumanReadableCopyright"))
+    }
+
+    func testCopyIsResignedWithoutHardenedRuntimeAndRestrictedEntitlements() throws {
+        let original = try makeHardenedApp()
+        let instance = try makeInstance(app: original)
+        XCTAssertFalse(PreferencesIsolation.allowsLibraryInjection(appAt: original))
+
+        let copy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: copy.path.appendingPathComponent("Contents/embedded.provisionprofile").path))
+        XCTAssertFalse(PreferencesIsolation.usesHardenedRuntime(appAt: copy.path))
+        XCTAssertTrue(PreferencesIsolation.allowsLibraryInjection(appAt: copy.path))
+        XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
+
+        let entitlements = PreferencesIsolation.entitlements(appAt: copy.path)
+        XCTAssertEqual(entitlements["com.apple.security.device.camera"] as? Bool, true)
+        XCTAssertNil(entitlements["keychain-access-groups"])
+        XCTAssertNil(entitlements["com.apple.developer.team-identifier"])
+        XCTAssertNil(entitlements["com.apple.application-identifier"])
+    }
+
+    func testCopyRecordsOriginalVersionAndDetectsUpdates() throws {
+        let original = try makeHardenedApp(version: "4.0.6")
+        var instance = try makeInstance(app: original)
+        instance.privateCopy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+
+        XCTAssertFalse(PrivateCopyBuilder.isOutdated(instance))
+
+        let plistURL = original.appendingPathComponent("Contents/Info.plist")
+        let plist = try XCTUnwrap(NSMutableDictionary(contentsOf: plistURL))
+        plist["CFBundleShortVersionString"] = "4.0.7"
+        plist.write(to: plistURL, atomically: true)
+
+        XCTAssertTrue(PrivateCopyBuilder.isOutdated(instance))
+    }
+
+    func testInstanceLaunchesAndMatchesTheCopy() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        XCTAssertEqual(instance.launchAppPath, original)
+
+        instance.privateCopy = try PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones")).build(for: instance, icon: nil)
+
+        XCTAssertEqual(instance.launchAppPath, instance.privateCopy?.path)
+        XCTAssertTrue(LauncherBuilder().script(for: instance).contains("open -n -a \(LauncherBuilder.shellQuote(instance.privateCopy!.path.path))"))
+
+        let process = RunningProcess(pid: 9, bundleURL: instance.privateCopy!.path, home: instance.dataPath.path)
+        XCTAssertEqual(RunningInstanceMatcher.match(instances: [instance], processes: [process]), [instance.id: 9])
+    }
+
+    func testRebuildingIdentityRenamesCopy() throws {
+        let original = try makeHardenedApp()
+        var instance = try makeInstance(app: original)
+        let builder = PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones"))
+        instance.privateCopy = try builder.build(for: instance, icon: nil)
+
+        instance.rename(to: "Second Profile")
+        instance.privateCopy = try builder.updateIdentity(of: instance, icon: nil)
+
+        let copy = try XCTUnwrap(instance.privateCopy)
+        XCTAssertEqual(copy.path.lastPathComponent, "Second Profile.app")
+        XCTAssertEqual(try info(copy.path)["CFBundleName"] as? String, "Second Profile")
+        XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
+    }
+}

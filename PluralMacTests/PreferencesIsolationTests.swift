@@ -21,7 +21,28 @@ final class PreferencesIsolationTests: XCTestCase {
 
         XCTAssertEqual(environment["DYLD_INSERT_LIBRARIES"], PreferencesIsolation.installedShimURL.path)
         XCTAssertEqual(environment[PreferencesIsolation.fileEnvironmentKey],
-                       "/tmp/work/Library/Preferences/\(instance.targetBundleIdentifier).plist")
+                       "/tmp/work/Library/Preferences/\(instance.targetBundleIdentifier).pluralmacplus.plist")
+    }
+
+    /// cfprefsd mirrors writes into the real app domain when the file is named like the bundle ID
+    func testPreferencesFileIsNotNamedLikeTheAppDomain() {
+        let file = PreferencesIsolation.preferencesFile(for: makeInstance())
+        XCTAssertNotEqual(file.deletingPathExtension().lastPathComponent, makeInstance().targetBundleIdentifier)
+    }
+
+    func testSeedMovesOnFromLegacyInstanceFile() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let shared = folder.appendingPathComponent("shared.plist")
+        try Data("shared".utf8).write(to: shared)
+        let instance = makeInstance(dataPath: folder.appendingPathComponent("data"))
+        let legacy = PreferencesIsolation.legacyPreferencesFile(for: instance)
+        try FileManager.default.createDirectory(at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("legacy".utf8).write(to: legacy)
+
+        try PreferencesIsolation.seedPreferences(for: instance, from: shared)
+
+        XCTAssertEqual(try String(contentsOf: PreferencesIsolation.preferencesFile(for: instance), encoding: .utf8), "legacy")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
     }
 
     func testDetectsHardenedRuntime() throws {

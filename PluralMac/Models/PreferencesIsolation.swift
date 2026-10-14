@@ -32,8 +32,16 @@ nonisolated enum PreferencesIsolation {
         Bundle.main.privateFrameworksURL?.appendingPathComponent(shimFileName)
     }
 
-    /// Preferences file of an instance, laid out like ~/Library/Preferences
+    /// Preferences file of an instance. It must not be named like the bundle ID: for such a path
+    /// domain cfprefsd also mirrors AppKit apps' writes into the shared app domain.
     static func preferencesFile(dataPath: URL, bundleIdentifier: String) -> URL {
+        dataPath
+            .appendingPathComponent("Library/Preferences")
+            .appendingPathComponent("\(bundleIdentifier).pluralmacplus.plist")
+    }
+
+    /// File name used before 1.1.2 (named like the bundle ID, so writes leaked into the shared domain)
+    static func legacyPreferencesFile(dataPath: URL, bundleIdentifier: String) -> URL {
         dataPath
             .appendingPathComponent("Library/Preferences")
             .appendingPathComponent("\(bundleIdentifier).plist")
@@ -72,9 +80,14 @@ nonisolated enum PreferencesIsolation {
     static func allowsLibraryInjection(appAt url: URL) -> Bool {
         guard usesHardenedRuntime(appAt: url) else { return true }
 
-        let entitlements = signingInformation(appAt: url)?[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
+        let entitlements = entitlements(appAt: url)
         return entitlements["com.apple.security.cs.allow-dyld-environment-variables"] as? Bool == true
             && entitlements["com.apple.security.cs.disable-library-validation"] as? Bool == true
+    }
+
+    /// Entitlements of the app's main executable
+    static func entitlements(appAt url: URL) -> [String: Any] {
+        signingInformation(appAt: url)?[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
     }
 
     private static func signingInformation(appAt url: URL) -> [String: Any]? {
@@ -96,11 +109,19 @@ extension PreferencesIsolation {
         preferencesFile(dataPath: instance.dataPath, bundleIdentifier: instance.targetBundleIdentifier)
     }
 
-    /// Gives the instance a copy of the shared preferences, unless it already has its own
+    static func legacyPreferencesFile(for instance: AppInstance) -> URL {
+        legacyPreferencesFile(dataPath: instance.dataPath, bundleIdentifier: instance.targetBundleIdentifier)
+    }
+
+    /// Gives the instance its starting preferences unless it already has its own: the file from an
+    /// earlier version of PluralMac Plus if present, otherwise a copy of the shared preferences
     static func seedPreferences(for instance: AppInstance, from shared: URL? = nil) throws {
         let file = preferencesFile(for: instance)
-        let source = shared ?? sharedPreferencesFile(bundleIdentifier: instance.targetBundleIdentifier)
+        let legacy = legacyPreferencesFile(for: instance)
         let fileManager = FileManager.default
+        let source = fileManager.fileExists(atPath: legacy.path)
+            ? legacy
+            : (shared ?? sharedPreferencesFile(bundleIdentifier: instance.targetBundleIdentifier))
 
         guard !fileManager.fileExists(atPath: file.path), fileManager.fileExists(atPath: source.path) else { return }
         try fileManager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

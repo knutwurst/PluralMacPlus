@@ -70,7 +70,7 @@ enum RunningInstanceMatcher {
     static func match(instances: [AppInstance], processes: [RunningProcess]) -> [UUID: pid_t] {
         var matches: [UUID: pid_t] = [:]
         for instance in instances {
-            let appPath = instance.targetAppPath.standardizedFileURL.path
+            let appPath = instance.launchAppPath.standardizedFileURL.path
             let dataPath = instance.dataPath.standardizedFileURL.path
 
             let process = processes.first { process in
@@ -87,7 +87,7 @@ enum RunningInstanceMatcher {
 
     /// Running processes of the instances' target apps, including their HOME
     static func runningProcesses(for instances: [AppInstance]) -> [RunningProcess] {
-        let targetPaths = Set(instances.map { $0.targetAppPath.standardizedFileURL.path })
+        let targetPaths = Set(instances.map { $0.launchAppPath.standardizedFileURL.path })
 
         return NSWorkspace.shared.runningApplications.compactMap { app in
             guard let bundleURL = app.bundleURL,

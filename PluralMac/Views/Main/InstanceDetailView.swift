@@ -29,6 +29,7 @@ struct InstanceDetailView: View {
     @State private var launcherIconHue: Double?
     @State private var showLaunchOptionsEditor = false
     @State private var confirmNewDeviceID = false
+    @State private var confirmPrivateCopy = false
     @State private var editedEnvironment: [String: String] = [:]
     @State private var editedArguments: [String] = []
     
@@ -246,6 +247,7 @@ struct InstanceDetailView: View {
         DetailSection(title: "Data Isolation") {
             DetailRow(label: "Method", value: instance.effectiveIsolationMethod.rawValue.capitalized)
             preferencesRows
+            privateCopyRows
             deviceIDRows
             DetailRow(label: "Data Path", value: instance.dataPath.path)
                 .contextMenu {
@@ -296,7 +298,60 @@ struct InstanceDetailView: View {
     
     /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
     private var targetBlocksInjection: Bool {
-        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.targetAppPath)
+        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.launchAppPath)
+    }
+    
+    private var isBuildingCopy: Bool {
+        viewModel.instancesBuildingCopy.contains(instance.id)
+    }
+    
+    @ViewBuilder
+    private var privateCopyRows: some View {
+        if let copy = instance.privateCopy {
+            DetailRow(label: "App", value: "Private copy, made from version \(copy.originalVersion)")
+                .contextMenu {
+                    Button("Show in Finder") { LaunchServicesHelper.revealInFinder(copy.path) }
+                }
+            if viewModel.isPrivateCopyOutdated(instance) {
+                Label("The original app was updated to \(PrivateCopyBuilder.versionString(of: instance.targetAppPath)). Recreate the copy to use the new version.",
+                      systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            HStack(spacing: 8) {
+                Button("Recreate Copy") {
+                    Task { await viewModel.createPrivateCopy(for: instance) }
+                }
+                Button("Use Original App") {
+                    Task { await viewModel.removePrivateCopy(from: instance) }
+                }
+                if isBuildingCopy {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .disabled(isRunning || isBuildingCopy)
+        } else if targetBlocksInjection {
+            HStack(spacing: 8) {
+                Button("Use a Private Copy...") {
+                    confirmPrivateCopy = true
+                }
+                .disabled(isRunning || isBuildingCopy)
+                if isBuildingCopy {
+                    ProgressView().controlSize(.small)
+                    Text("Copying and signing...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .confirmationDialog("Run this instance from a private copy?", isPresented: $confirmPrivateCopy, titleVisibility: .visible) {
+                Button("Create Private Copy") {
+                    Task { await viewModel.createPrivateCopy(for: instance) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("PluralMac Plus copies the app, names it \"\(instance.name)\" and signs the copy without Hardened Runtime, so preferences and device ID can be separated. The copy shows the instance name in the Dock.\n\nUpdates of the original don't reach the copy; recreate it after updating. macOS may ask again for camera or microphone access. Apps that use iCloud, push notifications or keychain groups may not start from a copy.")
+            }
+        }
     }
     
     @ViewBuilder
@@ -310,7 +365,7 @@ struct InstanceDetailView: View {
         .disabled(targetBlocksInjection && instance.separatePreferences != true)
         
         Text(targetBlocksInjection
-             ? "Not available: this app uses Hardened Runtime and doesn't allow PluralMac Plus to redirect its preferences. Chromium and Electron apps keep their real settings in the profile folder, which is separated anyway."
+             ? "Not available for the original: it uses Hardened Runtime and doesn't allow PluralMac Plus to redirect its preferences. Chromium and Electron apps keep their real settings in the profile folder, which is separated anyway. Otherwise you can run the instance from a private copy."
              : "Keeps the app's settings (UserDefaults) in the data folder instead of sharing them with other instances. Applies after restarting the instance.")
             .font(.caption)
             .foregroundStyle(.secondary)

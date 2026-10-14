@@ -40,6 +40,9 @@ final class InstanceViewModel {
     /// Instances whose data folder is currently being moved
     var instancesMovingData: Set<UUID> = []
     
+    /// Instances whose private app copy is being built
+    var instancesBuildingCopy: Set<UUID> = []
+    
     // MARK: - Private Properties
     
     private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "InstanceViewModel")
@@ -101,8 +104,11 @@ final class InstanceViewModel {
         // Launchers and instances load the preferences shim from a stable location
         do {
             try PreferencesIsolation.installShim()
+            for instance in instances where instance.separatePreferences == true {
+                try PreferencesIsolation.seedPreferences(for: instance)
+            }
         } catch {
-            logger.error("Installing preferences shim failed: \(error.localizedDescription)")
+            logger.error("Preparing separate preferences failed: \(error.localizedDescription)")
         }
         
         // Instances may still be running from before PluralMac Plus was (re)opened
@@ -240,6 +246,7 @@ final class InstanceViewModel {
         updated.rename(to: name)
         
         do {
+            try await refreshPrivateCopyIdentityIfIdle(&updated)
             try await updateInstance(updated)
         } catch {
             handleError(error, context: "renaming instance")
@@ -347,10 +354,79 @@ final class InstanceViewModel {
         updated.touch()
         
         do {
+            try await refreshPrivateCopyIdentityIfIdle(&updated)
             try await updateInstance(updated)
         } catch {
             handleError(error, context: "changing launcher icon")
         }
+    }
+    
+    // MARK: - Private App Copy
+    
+    /// Build (or rebuild) a private copy of the app for the instance. Errors are shown in the error alert.
+    func createPrivateCopy(for instance: AppInstance) async {
+        guard !(await directLauncher.isRunning(instance.id)) else {
+            handleError(PrivateCopyError.instanceRunning, context: "creating private copy")
+            return
+        }
+        
+        instancesBuildingCopy.insert(instance.id)
+        defer { instancesBuildingCopy.remove(instance.id) }
+        
+        let id = instance.id, name = instance.name, original = instance.targetAppPath
+        let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
+        
+        do {
+            // Copying and signing a large app takes a while; keep the UI responsive
+            let copy = try await Task.detached {
+                try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon)
+            }.value
+            
+            var updated = instances.first { $0.id == instance.id } ?? instance
+            updated.privateCopy = copy
+            updated.touch()
+            try await updateInstance(updated)
+            logger.info("Built private copy of \(instance.name) at \(copy.path.path)")
+        } catch {
+            handleError(error, context: "creating private copy")
+        }
+    }
+    
+    /// Go back to running the original app; the copy moves to the Trash
+    func removePrivateCopy(from instance: AppInstance) async {
+        guard !(await directLauncher.isRunning(instance.id)) else {
+            handleError(PrivateCopyError.instanceRunning, context: "removing private copy")
+            return
+        }
+        
+        trashPrivateCopy(of: instance)
+        var updated = instance
+        updated.privateCopy = nil
+        updated.touch()
+        await save(updated, context: "removing private copy")
+    }
+    
+    /// Whether the original app was updated after the copy was made
+    func isPrivateCopyOutdated(_ instance: AppInstance) -> Bool {
+        PrivateCopyBuilder.isOutdated(instance)
+    }
+    
+    private func trashPrivateCopy(of instance: AppInstance) {
+        let folder = PrivateCopyBuilder.defaultClonesDirectory.appendingPathComponent(instance.id.uuidString)
+        if FileManager.default.fileExists(atPath: folder.path) {
+            try? FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+        }
+    }
+    
+    /// Apply name and icon to the copy unless the instance is running (then it happens before the next launch)
+    private func refreshPrivateCopyIdentityIfIdle(_ instance: inout AppInstance) async throws {
+        guard let current = instance.privateCopy, !(await directLauncher.isRunning(instance.id)) else { return }
+        
+        let id = instance.id, name = instance.name, original = instance.targetAppPath
+        let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
+        instance.privateCopy = try await Task.detached {
+            try PrivateCopyBuilder().updateIdentity(of: current, instanceID: id, name: name, original: original, iconPNG: icon)
+        }.value
     }
     
     // MARK: - Data Folder
@@ -464,6 +540,9 @@ final class InstanceViewModel {
             }
         }
         
+        // Private app copy goes to the Trash as well
+        trashPrivateCopy(of: instance)
+        
         // Move our launcher app to the Trash (recoverable)
         if let launcher = instance.launcherPath, LauncherBuilder.isLauncher(at: launcher, for: instance.id) {
             try? FileManager.default.trashItem(at: launcher, resultingItemURL: nil)
@@ -500,6 +579,14 @@ final class InstanceViewModel {
         }
         
         logger.info("Launching instance directly: \(instance.name)")
+        
+        // A rename or icon change while the instance ran is applied to the copy now
+        var instance = instance
+        if let copy = instance.privateCopy,
+           (NSDictionary(contentsOf: copy.path.appendingPathComponent("Contents/Info.plist"))?["CFBundleName"] as? String) != instance.name {
+            try await refreshPrivateCopyIdentityIfIdle(&instance)
+            try await updateInstance(instance)
+        }
         
         // Launch the app directly with modified environment
         let process = try await directLauncher.launch(instance)
@@ -679,6 +766,14 @@ extension InstanceViewModel {
 }
 
 // MARK: - Errors
+
+enum PrivateCopyError: LocalizedError {
+    case instanceRunning
+    
+    var errorDescription: String? {
+        "Quit the instance first. Its app copy can't be replaced while it runs."
+    }
+}
 
 enum InstanceActionError: LocalizedError {
     case dataPathInUse(String)

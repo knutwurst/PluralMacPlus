@@ -42,7 +42,8 @@ actor DirectLauncher {
         logger.info("Launching instance with NSWorkspace: \(instance.name)")
         
         // Capture values from instance
-        let targetAppPath = instance.targetAppPath
+        let targetAppPath = instance.launchAppPath
+        let usesPrivateCopy = instance.privateCopy != nil
         let dataPath = instance.dataPath
         let instanceId = instance.id
         let instanceName = instance.name
@@ -60,6 +61,7 @@ actor DirectLauncher {
         // The preferences shim must be in place before the app loads it
         if instance.separatePreferences == true {
             try PreferencesIsolation.installShim()
+            try PreferencesIsolation.seedPreferences(for: instance)
         }
         
         // Launch using NSWorkspace - use continuation for callback-based API
@@ -86,6 +88,15 @@ actor DirectLauncher {
                         continuation.resume(throwing: DirectLaunchError.launchFailed("No application returned"))
                     }
                 }
+            }
+        }
+        
+        // Launching registers the copy with LaunchServices once the app has started; unregister it
+        // afterwards so bundle ID and URL schemes point to the original again
+        if usesPrivateCopy {
+            Task.detached {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                PrivateCopyBuilder.unregisterFromLaunchServices(targetAppPath)
             }
         }
         

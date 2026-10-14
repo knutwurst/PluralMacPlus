@@ -190,7 +190,7 @@ struct LauncherBuilder {
         lines.append("/bin/mkdir -p \(q(instance.dataPath.path))")
         lines.append("")
 
-        var command = ["exec /usr/bin/open -n -a \(q(instance.targetAppPath.path))"]
+        var command = ["\(instance.privateCopy == nil ? "exec " : "")/usr/bin/open -n -a \(q(instance.launchAppPath.path))"]
         for (key, value) in instance.effectiveEnvironmentVariables.sorted(by: { $0.key < $1.key }) {
             command.append("--env \(q("\(key)=\(value)"))")
         }
@@ -199,6 +199,12 @@ struct LauncherBuilder {
             command.append("--args " + arguments.map(q).joined(separator: " "))
         }
         lines.append(command.joined(separator: " \\\n    "))
+
+        // LaunchServices registers the private copy once it has started; unregister it a little later
+        // so bundle ID and URL schemes point to the original again
+        if let copy = instance.privateCopy {
+            lines.append("( /bin/sleep 3; \(q(PrivateCopyBuilder.lsregisterPath)) -u \(q(copy.path.path)) ) >/dev/null 2>&1 &")
+        }
 
         return lines.joined(separator: "\n") + "\n"
     }

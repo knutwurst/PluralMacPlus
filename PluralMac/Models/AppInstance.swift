@@ -60,6 +60,9 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Keep UserDefaults in the instance folder (true) instead of the shared ~/Library/Preferences
     var separatePreferences: Bool?
     
+    /// Private copy of the app the instance runs instead of the original (nil = original)
+    var privateCopy: PrivateAppCopy?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -135,6 +138,11 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// The effective data isolation method (override or default for app type)
     var effectiveIsolationMethod: DataIsolationMethod {
         isolationMethodOverride ?? targetAppType.isolationMethod
+    }
+    
+    /// The app bundle to launch: the private copy if there is one, otherwise the original
+    var launchAppPath: URL {
+        privateCopy?.path ?? targetAppPath
     }
     
     /// Check if the shortcut bundle exists
@@ -321,6 +329,7 @@ extension AppInstance {
         case launcherIconHue
         case hardwareIDOverride
         case separatePreferences
+        case privateCopy
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon
