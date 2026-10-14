@@ -96,7 +96,7 @@ struct InstanceRowView: View {
                 isHovering = hovering
             }
         }
-        .task {
+        .task(id: iconKey) {
             await loadIcon()
         }
     }
@@ -142,15 +142,14 @@ struct InstanceRowView: View {
     
     // MARK: - Icon Loading
     
+    /// Changes whenever the icon source or color changes
+    private var iconKey: String {
+        "\(instance.customIconPath?.path ?? "")|\(instance.launcherIconHue ?? -1)"
+    }
+    
     @MainActor
     private func loadIcon() async {
-        // Try to load from shortcut bundle first
-        if instance.shortcutExists {
-            appIcon = NSWorkspace.shared.icon(forFile: instance.shortcutPath.path)
-        } else {
-            // Fall back to target app icon
-            appIcon = NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
-        }
+        appIcon = viewModel.displayIcon(for: instance)
     }
 }
 

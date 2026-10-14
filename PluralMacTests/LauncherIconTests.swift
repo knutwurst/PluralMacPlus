@@ -36,6 +36,25 @@ final class LauncherIconTests: XCTestCase {
         XCTAssertEqual(tinted.size, NSSize(width: 64, height: 64))
     }
 
+    func testDisplayIconShowsInstanceColor() throws {
+        let folder = try makeTemporaryDirectory(self)
+        let iconFile = folder.appendingPathComponent("red.png")
+        let red = solidImage(.red, size: 64)
+        let rep = NSBitmapImageRep(data: red.tiffRepresentation!)!
+        try rep.representation(using: .png, properties: [:])!.write(to: iconFile)
+
+        var instance = AppInstance(name: "Work Profile", application: makeTestApplication())
+        instance.customIconPath = iconFile
+        let viewModel = InstanceViewModel()
+
+        let original = try centerColor(of: viewModel.displayIcon(for: instance))
+        XCTAssertGreaterThan(original.redComponent, original.greenComponent)
+
+        instance.launcherIconHue = 120
+        let tinted = try centerColor(of: viewModel.displayIcon(for: instance))
+        XCTAssertGreaterThan(tinted.greenComponent, tinted.redComponent)
+    }
+
     func testInstancesSavedWithoutHueStillDecode() throws {
         let instance = AppInstance(name: "Work Profile", application: makeTestApplication())
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: try encode(instance)) as? [String: Any])

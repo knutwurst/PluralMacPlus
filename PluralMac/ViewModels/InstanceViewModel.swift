@@ -43,6 +43,9 @@ final class InstanceViewModel {
     /// Instances whose private app copy is being built
     var instancesBuildingCopy: Set<UUID> = []
     
+    /// Tinted icons for the list and detail view, keyed by icon source and hue
+    @ObservationIgnored private var displayIconCache: [String: NSImage] = [:]
+    
     // MARK: - Private Properties
     
     private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "InstanceViewModel")
@@ -376,6 +379,28 @@ final class InstanceViewModel {
         
         guard let hue = instance.launcherIconHue else { return base }
         return LauncherBuilder.tinted(base, hueDegrees: hue)
+    }
+    
+    /// Icon the app shows for an instance: custom icon or the app's own, in the instance color
+    func displayIcon(for instance: AppInstance) -> NSImage {
+        let key = "\(instance.customIconPath?.path ?? instance.targetAppPath.path)|\(instance.launcherIconHue.map { String($0) } ?? "-")"
+        if let cached = displayIconCache[key] {
+            return cached
+        }
+        
+        let base: NSImage
+        if let custom = instance.customIconPath, let image = NSImage(contentsOf: custom) {
+            base = image
+        } else {
+            base = NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
+        }
+        // Small copy: list and header show it at up to 64 pt
+        let small = base.copy() as! NSImage
+        small.size = NSSize(width: 128, height: 128)
+        
+        let icon = instance.launcherIconHue.map { LauncherBuilder.tinted(small, hueDegrees: $0) } ?? small
+        displayIconCache[key] = icon
+        return icon
     }
     
     /// Change the launcher icon color; an existing launcher is rebuilt. Errors are shown in the error alert.

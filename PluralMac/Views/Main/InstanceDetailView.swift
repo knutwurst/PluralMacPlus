@@ -86,7 +86,7 @@ struct InstanceDetailView: View {
         .toolbar {
             toolbarContent
         }
-        .task {
+        .task(id: "\(instance.id)|\(instance.customIconPath?.path ?? "")|\(instance.launcherIconHue ?? -1)") {
             await loadIcon()
         }
         .alert("Rename Instance", isPresented: $isRenaming) {
@@ -690,11 +690,7 @@ struct InstanceDetailView: View {
     
     @MainActor
     private func loadIcon() async {
-        if instance.shortcutExists {
-            appIcon = NSWorkspace.shared.icon(forFile: instance.shortcutPath.path)
-        } else {
-            appIcon = NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
-        }
+        appIcon = viewModel.displayIcon(for: instance)
     }
 }
 
