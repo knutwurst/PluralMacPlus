@@ -96,6 +96,7 @@ struct InstanceListView: View {
             } label: {
                 Label("Move Data Folder...", systemImage: "externaldrive")
             }
+            .disabled(RunningInstancesManager.shared.isRunning(instance.id) || viewModel.instancesMovingData.contains(instance.id))
             
             // An instance with a private copy starts from the copy itself
             if instance.privateCopy == nil {
@@ -109,7 +110,6 @@ struct InstanceListView: View {
                     Label("Create Launcher App...", systemImage: "app.badge")
                 }
             }
-            .disabled(RunningInstancesManager.shared.isRunning(instance.id) || viewModel.instancesMovingData.contains(instance.id))
             
             Divider()
             
