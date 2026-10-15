@@ -43,24 +43,33 @@ actor DirectLauncher {
         
         // Capture values from instance
         let targetAppPath = instance.launchAppPath
-        let usesPrivateCopy = instance.privateCopy != nil
-        let dataPath = instance.dataPath
+        // A starter has its own bundle ID and no URL schemes, so it can stay registered
+        let unregistersCopy = instance.privateCopy.map { !$0.isStarter } ?? false
+        let dataPath = instance.isolationRoot
+        let redirectsHome = instance.redirectsHome
+        let maintainedFolder = instance.maintainedFolder
         let instanceId = instance.id
         let instanceName = instance.name
         let envVars = instance.effectiveEnvironmentVariables
-        let cmdArgs = instance.effectiveCommandLineArguments
+        // The start script of a copy or starter adds the arguments itself
+        let cmdArgs = instance.privateCopy.map { _ in [] } ?? instance.effectiveCommandLineArguments
         
         // Validate target app exists
         guard fileManager.fileExists(atPath: targetAppPath.path) else {
             throw DirectLaunchError.appNotFound(targetAppPath)
         }
         
-        // Ensure data directory exists
-        try prepareDataDirectory(dataPath: dataPath)
+        // Ensure data directory exists (the app creates its own profile folder)
+        if redirectsHome {
+            try prepareDataDirectory(dataPath: dataPath)
+        } else if let volume = DataLocation.unmountedVolume(for: dataPath) {
+            throw DirectLaunchError.dataVolumeUnavailable(volume)
+        }
         
         // On FAT/exFAT, companion "._*" files break apps that delete folders on startup
-        if AppleDoubleCleaner.needsCleanup(at: dataPath) {
-            let removed = AppleDoubleCleaner.removeAppleDoubleFiles(in: dataPath)
+        if let folder = maintainedFolder, FileManager.default.fileExists(atPath: folder.path),
+           AppleDoubleCleaner.needsCleanup(at: folder) {
+            let removed = AppleDoubleCleaner.removeAppleDoubleFiles(in: folder)
             logger.info("Removed \(removed) AppleDouble files before launching \(instanceName)")
         }
         
@@ -99,7 +108,7 @@ actor DirectLauncher {
         
         // Launching registers the copy with LaunchServices once the app has started; unregister it
         // afterwards so bundle ID and URL schemes point to the original again
-        if usesPrivateCopy {
+        if unregistersCopy {
             Task.detached {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 PrivateCopyBuilder.unregisterFromLaunchServices(targetAppPath)

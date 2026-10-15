@@ -29,6 +29,15 @@ final class RunningInstanceDiscoveryTests: XCTestCase {
         XCTAssertNil(environment?["--flag"])
     }
 
+    func testParseReadsArgumentsWithoutExecutable() {
+        let buffer = procArgsBuffer(argv: ["/Applications/Example.app/Contents/MacOS/Example", "--user-data-dir=/a b"], env: ["HOME=/x"])
+        XCTAssertEqual(ProcessEnvironment.parseArguments(procArgs: buffer), ["--user-data-dir=/a b"])
+    }
+
+    func testReadsArgumentsOfOwnProcess() {
+        XCTAssertEqual(ProcessEnvironment.arguments(of: getpid()), Array(CommandLine.arguments.dropFirst()))
+    }
+
     func testParseKeepsEqualsSignsInValues() {
         let buffer = procArgsBuffer(argv: ["x"], env: ["OPTS=a=b"])
         XCTAssertEqual(ProcessEnvironment.parse(procArgs: buffer)?["OPTS"], "a=b")

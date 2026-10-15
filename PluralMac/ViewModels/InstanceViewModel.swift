@@ -340,7 +340,9 @@ final class InstanceViewModel {
     
     private func installLauncher(for instance: AppInstance, in folder: URL) async throws -> URL {
         // The launcher starts the app without PluralMac Plus, so prepare the data folder now
-        try await directLauncher.prepareDataDirectory(dataPath: instance.dataPath)
+        if instance.redirectsHome {
+            try await directLauncher.prepareDataDirectory(dataPath: instance.dataPath)
+        }
         
         let builder = LauncherBuilder()
         let launcher = try builder.build(for: instance, in: folder)
@@ -431,11 +433,13 @@ final class InstanceViewModel {
         let id = instance.id, name = instance.name, original = instance.targetAppPath
         let icon = PrivateCopyBuilder.pngData(launcherIcon(for: instance))
         let startScript = PrivateCopyBuilder.startScript(for: instance)
+        let starter = PrivateCopyBuilder.usesStarter(instance)
         
         do {
             // Copying and signing a large app takes a while; keep the UI responsive
             let copy = try await Task.detached {
-                try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon, startScript: startScript)
+                try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon,
+                                               startScript: startScript, starter: starter)
             }.value
             
             var updated = instances.first { $0.id == instance.id } ?? instance

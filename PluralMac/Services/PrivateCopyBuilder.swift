@@ -21,6 +21,18 @@ struct PrivateAppCopy: Codable, Hashable, Sendable {
 
     /// Icon hue the copy was built with (nil = original colors)
     var iconHue: Double?
+
+    enum Kind: String, Codable, Sendable {
+        /// Re-signed clone of the whole app
+        case clone
+        /// Small bundle with its own name and icon that execs the original binary
+        case starter
+    }
+
+    /// nil = clone (copies made before starters existed)
+    var kind: Kind?
+
+    var isStarter: Bool { kind == .starter }
 }
 
 /// Builds private app copies: an APFS clone of the original, renamed to the instance, with its own
@@ -75,7 +87,7 @@ nonisolated struct PrivateCopyBuilder {
     // MARK: - Building
 
     /// Creates (or recreates) the private copy of `original` for an instance
-    func build(instanceID: UUID, name: String, original: URL, iconPNG: Data?, startScript: String) throws -> PrivateAppCopy {
+    func build(instanceID: UUID, name: String, original: URL, iconPNG: Data?, startScript: String, starter: Bool = false) throws -> PrivateAppCopy {
         let folder = clonesDirectory.appendingPathComponent(instanceID.uuidString)
         if FileManager.default.fileExists(atPath: folder.path) {
             try removeItem(folder)
@@ -83,6 +95,10 @@ nonisolated struct PrivateCopyBuilder {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         let copy = folder.appendingPathComponent("\(AppInstance.sanitizeFileName(name)).app")
+        if starter {
+            try writeStarter(at: copy, instanceID: instanceID, name: name, iconPNG: iconPNG, startScript: startScript)
+            return PrivateAppCopy(path: copy, originalVersion: Self.versionString(of: original), createdAt: Date(), kind: .starter)
+        }
         try cloneBundle(from: original, to: copy)
         try? FileManager.default.removeItem(at: copy.appendingPathComponent("Contents/embedded.provisionprofile"))
 
@@ -109,6 +125,11 @@ nonisolated struct PrivateCopyBuilder {
             updated.path = renamed
         }
 
+        if current.isStarter {
+            try writeStarter(at: updated.path, instanceID: instanceID, name: name, iconPNG: iconPNG, startScript: startScript)
+            return updated
+        }
+
         try applyIdentity(to: updated.path, name: name, iconPNG: iconPNG, startScript: startScript)
         // The real binary of a copy from an earlier version was signed as main executable and is
         // bound to the old Info.plist; sign it on its own before sealing the bundle again
@@ -120,6 +141,46 @@ nonisolated struct PrivateCopyBuilder {
     }
 
     // MARK: - Steps
+
+    /// Writes (or rewrites) a Dock starter bundle: Info.plist with the instance's name and own
+    /// bundle ID, the start script as main executable and the icon. Nothing of the original is copied.
+    private func writeStarter(at bundle: URL, instanceID: UUID, name: String, iconPNG: Data?, startScript: String) throws {
+        let contents = bundle.appendingPathComponent("Contents")
+        let macOS = contents.appendingPathComponent("MacOS")
+        let resources = contents.appendingPathComponent("Resources")
+        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+
+        var info: [String: Any] = [
+            "CFBundleIdentifier": "com.knutwurst.pluralmacplus.starter.\(instanceID.uuidString.lowercased())",
+            "CFBundleExecutable": Self.startScriptName,
+            "CFBundleName": name,
+            "CFBundleDisplayName": name,
+            "CFBundlePackageType": "APPL",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleInfoDictionaryVersion": "6.0",
+            "LSMinimumSystemVersion": "14.0",
+            // Unlike a launcher, the starter becomes the running app and has to show in the Dock
+            "LSUIElement": false,
+            "NSHighResolutionCapable": true,
+            LauncherBuilder.instanceIDKey: instanceID.uuidString,
+        ]
+        let iconURL = resources.appendingPathComponent("\(Self.iconFileName).icns")
+        if let iconPNG, Self.writeIcon(iconPNG, to: iconURL) {
+            info["CFBundleIconFile"] = Self.iconFileName
+        }
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+
+        let scriptURL = macOS.appendingPathComponent(Self.startScriptName)
+        try startScript.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+
+        try codesign(["--force", "--sign", "-", bundle.path])
+        try codesign(["--verify", "--deep", "--strict", bundle.path])
+        Self.markChanged(bundle)
+    }
 
     private func cloneBundle(from source: URL, to destination: URL) throws {
         // COPYFILE_CLONE makes an APFS clone (near-zero disk use) and falls back to a copy
@@ -288,8 +349,11 @@ nonisolated struct PrivateCopyBuilder {
 extension PrivateCopyBuilder {
 
     func build(for instance: AppInstance, icon: NSImage?) throws -> PrivateAppCopy {
-        try build(instanceID: instance.id, name: instance.name, original: instance.targetAppPath,
-                  iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: instance))
+        var fresh = instance
+        fresh.privateCopy = nil
+        return try build(instanceID: instance.id, name: instance.name, original: instance.targetAppPath,
+                         iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: fresh),
+                         starter: Self.usesStarter(fresh))
     }
 
     func updateIdentity(of instance: AppInstance, icon: NSImage?) throws -> PrivateAppCopy? {
@@ -298,10 +362,20 @@ extension PrivateCopyBuilder {
                                   iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: instance))
     }
 
-    /// Start script for the instance's copy, calling the original app's binary
+    /// Whether the instance's own app is a Dock starter rather than a re-signed clone. Apps isolated by
+    /// argument get a starter: a clone would only risk losing access to their keychain items.
+    static func usesStarter(_ instance: AppInstance) -> Bool {
+        instance.privateCopy.map(\.isStarter) ?? !instance.canUsePrivateCopy
+    }
+
+    /// Start script for the instance's copy or starter, calling the original app's binary
     static func startScript(for instance: AppInstance) -> String {
         let info = NSDictionary(contentsOf: instance.targetAppPath.appendingPathComponent("Contents/Info.plist"))
         let executable = info?["CFBundleExecutable"] as? String ?? ""
+        if usesStarter(instance) {
+            let binary = instance.targetAppPath.appendingPathComponent("Contents/MacOS/\(executable)")
+            return LauncherBuilder().starterScript(for: instance, binary: binary)
+        }
         return LauncherBuilder().copyStartScript(for: instance, executableName: executable)
     }
 
@@ -333,9 +407,9 @@ extension PrivateCopyBuilder {
         return script != startScript(for: instance)
     }
 
-    /// Whether the original app changed since the copy was made
+    /// Whether the original app changed since the copy was made (a starter always runs the current original)
     static func isOutdated(_ instance: AppInstance) -> Bool {
-        guard let copy = instance.privateCopy else { return false }
+        guard let copy = instance.privateCopy, !copy.isStarter else { return false }
         return versionString(of: instance.targetAppPath) != copy.originalVersion
     }
 

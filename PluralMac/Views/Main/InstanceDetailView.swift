@@ -303,7 +303,7 @@ struct InstanceDetailView: View {
     
     /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
     private var targetBlocksInjection: Bool {
-        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.launchAppPath)
+        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.codeAppPath)
     }
     
     private var isBuildingCopy: Bool {
@@ -325,7 +325,7 @@ struct InstanceDetailView: View {
                 }
             }
             .disabled(isRunning)
-            Text("The app keeps its whole profile here (--user-data-dir). PluralMac Plus never writes into an existing profile; only the app does. Don't run the same profile from two places at once.")
+            Text("The app keeps its whole profile here (--user-data-dir) and runs with your normal home folder, so it can use the login keychain. PluralMac Plus never writes into an existing profile; only the app does. Don't run the same profile from two places at once.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -347,7 +347,43 @@ struct InstanceDetailView: View {
     
     @ViewBuilder
     private var privateCopyRows: some View {
-        if let copy = instance.privateCopy {
+        if let starter = instance.privateCopy, starter.isStarter {
+            DetailRow(label: "App", value: "Own Dock app \"\(starter.path.deletingPathExtension().lastPathComponent)\"")
+                .contextMenu {
+                    Button("Show in Finder") { LaunchServicesHelper.revealInFinder(starter.path) }
+                }
+            HStack(spacing: 8) {
+                Button("Show in Finder") {
+                    LaunchServicesHelper.revealInFinder(starter.path)
+                }
+                Button("Remove Own Dock App") {
+                    Task { await viewModel.removePrivateCopy(from: instance) }
+                }
+                .help("Moves the Dock app to the Trash; the instance then shows as \(targetAppName) again")
+                if isBuildingCopy {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .disabled(isRunning || isBuildingCopy)
+            Text("Starts \(targetAppName) with this instance's profile, but the Dock shows the instance name and icon. \(targetAppName) itself stays untouched and keeps its updates. Keep it in the Dock (Options → Keep in Dock) to start the instance from there.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if !instance.canUsePrivateCopy {
+            HStack(spacing: 8) {
+                Button("Use Own Dock Name and Icon") {
+                    Task { await viewModel.createPrivateCopy(for: instance) }
+                }
+                .disabled(isRunning || isBuildingCopy)
+                if isBuildingCopy {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            Text(isRunning
+                 ? "Quit the instance first. Then it gets a small app of its own that shows the instance name and icon in the Dock."
+                 : "Creates a small app named \"\(instance.name)\" that starts \(targetAppName) with this profile. The Dock then shows the instance name and icon; \(targetAppName) itself is not copied or changed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if let copy = instance.privateCopy {
             DetailRow(label: "App", value: "Private copy, made from version \(copy.originalVersion)")
                 .contextMenu {
                     Button("Show in Finder") { LaunchServicesHelper.revealInFinder(copy.path) }
@@ -452,8 +488,8 @@ struct InstanceDetailView: View {
     
     private var launcherSection: some View {
         DetailSection(title: "Launcher App") {
-            if instance.privateCopy != nil {
-                Text("Not needed: this instance runs from its own copy of the app, which starts the instance by itself. Keep it in the Dock (Options → Keep in Dock) or open it from Finder or Spotlight.")
+            if let copy = instance.privateCopy {
+                Text("Not needed: this instance runs from its own \(copy.isStarter ? "Dock app" : "copy of the app"), which starts the instance by itself. Keep it in the Dock (Options → Keep in Dock) or open it from Finder or Spotlight.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if viewModel.hasLauncher(instance) {
@@ -533,10 +569,14 @@ struct InstanceDetailView: View {
     }
     
     private var iconCaption: String {
-        if instance.privateCopy != nil {
+        if let copy = instance.privateCopy {
+            let owner = copy.isStarter ? "the instance's Dock app" : "the app copy in the Dock and Cmd-Tab"
             return isRunning
-                ? "Used by the app copy in the Dock and Cmd-Tab. A new color applies after the instance quits."
-                : "Used by the app copy in the Dock and Cmd-Tab" + (viewModel.hasLauncher(instance) ? " and by the launcher app." : ".")
+                ? "Used by \(owner). A new color applies after the instance quits."
+                : "Used by \(owner)" + (viewModel.hasLauncher(instance) ? " and by the launcher app." : ".")
+        }
+        if !instance.canUsePrivateCopy {
+            return "Used by the launcher app. While the instance runs, the Dock shows the original app's icon; with its own Dock name and icon (Data Isolation) it shows this one."
         }
         return "Used by the launcher app. While the instance runs, the Dock shows the original app's icon; a private copy shows this one."
     }

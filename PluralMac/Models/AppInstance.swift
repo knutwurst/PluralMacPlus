@@ -160,6 +160,17 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         privateCopy?.path ?? targetAppPath
     }
     
+    /// The bundle whose code actually runs (a starter runs the original's binary)
+    var codeAppPath: URL {
+        privateCopy?.isStarter == true ? targetAppPath : launchAppPath
+    }
+    
+    /// Bundles a running process of this instance can report: a starter execs the original binary,
+    /// so macOS lists that process under the original app
+    var runningBundlePaths: [URL] {
+        privateCopy?.isStarter == true ? [launchAppPath, targetAppPath] : [launchAppPath]
+    }
+    
     /// Check if the shortcut bundle exists
     var shortcutExists: Bool {
         FileManager.default.fileExists(atPath: shortcutPath.path)
@@ -170,18 +181,41 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         FileManager.default.fileExists(atPath: dataPath.path)
     }
     
+    /// Apps isolated by argument keep everything in their profile folder and run with the user's own
+    /// HOME. A redirected HOME hides the login keychain from them: new keychain items (such as
+    /// Electron's safe storage key) fail, and the app falls back to an unencrypted key.
+    var redirectsHome: Bool {
+        isolationArguments.isEmpty
+    }
+    
+    /// The folder the instance's app writes into: the data folder (as HOME) or the profile folder
+    var isolationRoot: URL {
+        redirectsHome ? dataPath : appProfilePath
+    }
+    
+    /// Folder PluralMac Plus may clean up before launch; never an existing profile chosen by the user
+    var maintainedFolder: URL? {
+        redirectsHome || profilePath == nil ? dataPath : nil
+    }
+    
     /// Get the complete environment variables including HOME override if needed
     var effectiveEnvironmentVariables: [String: String] {
         var env = environmentVariables
         
-        // Always redirect HOME for complete isolation
-        // This ensures apps that hardcode paths still work
-        env["HOME"] = dataPath.path
-        
-        // Foundation ignores HOME (NSHomeDirectory, Caches, Application Support, HTTPStorages);
-        // CFFIXED_USER_HOME makes those follow the data folder as well. UserDefaults are not
-        // affected: cfprefsd resolves the preferences folder itself.
-        env["CFFIXED_USER_HOME"] = dataPath.path
+        if redirectsHome {
+            // Redirect HOME so apps that build paths from it stay in the data folder
+            env["HOME"] = dataPath.path
+            
+            // Foundation ignores HOME (NSHomeDirectory, Caches, Application Support, HTTPStorages);
+            // CFFIXED_USER_HOME makes those follow the data folder as well. UserDefaults are not
+            // affected: cfprefsd resolves the preferences folder itself.
+            env["CFFIXED_USER_HOME"] = dataPath.path
+            
+            // Also set XDG directories for apps that use them
+            env["XDG_CONFIG_HOME"] = dataPath.appendingPathComponent(".config").path
+            env["XDG_DATA_HOME"] = dataPath.appendingPathComponent(".local/share").path
+            env["XDG_CACHE_HOME"] = dataPath.appendingPathComponent(".cache").path
+        }
         
         // Redirect UserDefaults into the data folder (cfprefsd ignores HOME and CFFIXED_USER_HOME)
         if separatePreferences == true {
@@ -194,19 +228,12 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
             env[HardwareIdentity.environmentKey] = HardwareIdentity.ioregFunction(reporting: hardwareIDOverride)
         }
         
-        // Also set XDG directories for apps that use them
-        env["XDG_CONFIG_HOME"] = dataPath.appendingPathComponent(".config").path
-        env["XDG_DATA_HOME"] = dataPath.appendingPathComponent(".local/share").path
-        env["XDG_CACHE_HOME"] = dataPath.appendingPathComponent(".cache").path
-        
         return env
     }
     
     /// Get the complete command-line arguments including data isolation args
     var effectiveCommandLineArguments: [String] {
         var args = commandLineArguments
-        
-        // Check for app-specific arguments first
         let bundleId = targetBundleIdentifier.lowercased()
         
         // Spotify uses --mu for multiple instances
@@ -223,23 +250,27 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
             return args
         }
         
+        return args + isolationArguments
+    }
+    
+    /// Arguments that point the app at this instance's profile folder (empty = isolated by HOME)
+    var isolationArguments: [String] {
+        let bundleId = targetBundleIdentifier.lowercased()
+        if bundleId.contains("spotify") || bundleId.contains("discord") {
+            return []
+        }
         // Slack uses --user-data-dir
         if bundleId.contains("slack") {
-            args.append("--user-data-dir=\(appProfilePath.path)")
-            return args
+            return ["--user-data-dir=\(appProfilePath.path)"]
         }
-        
-        // Default behavior based on isolation method
         switch effectiveIsolationMethod {
         case .userDataDir:
-            args.append("--user-data-dir=\(appProfilePath.path)")
+            return ["--user-data-dir=\(appProfilePath.path)"]
         case .profileArgument:
-            args.append(contentsOf: ["-profile", appProfilePath.path])
+            return ["-profile", appProfilePath.path]
         case .homeRedirection, .none:
-            break
+            return []
         }
-        
-        return args
     }
     
     /// Default base directory for PluralMac data

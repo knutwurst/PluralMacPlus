@@ -20,8 +20,8 @@ final class ProfileFolderTests: XCTestCase {
 
         XCTAssertTrue(instance.effectiveCommandLineArguments.contains("--user-data-dir=/tmp/existing profile"))
         XCTAssertFalse(instance.effectiveCommandLineArguments.contains("--user-data-dir=/tmp/pmp-home"))
-        // HOME stays the PluralMac Plus data folder
-        XCTAssertEqual(instance.effectiveEnvironmentVariables["HOME"], "/tmp/pmp-home")
+        // HOME stays the user's own, so the app can reach the login keychain
+        XCTAssertNil(instance.effectiveEnvironmentVariables["HOME"])
     }
 
     func testLauncherDoesNotTouchProfileFolder() throws {
