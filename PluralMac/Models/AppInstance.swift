@@ -63,6 +63,10 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
     /// Private copy of the app the instance runs instead of the original (nil = original)
     var privateCopy: PrivateAppCopy?
     
+    /// Existing app profile for apps isolated by argument (--user-data-dir, -profile); nil = data folder.
+    /// PluralMac Plus never writes into it, only the app does.
+    var profilePath: URL?
+    
     /// Data isolation method override (nil = use default for app type)
     var isolationMethodOverride: DataIsolationMethod?
     
@@ -140,6 +144,17 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         isolationMethodOverride ?? targetAppType.isolationMethod
     }
     
+    /// Folder the app keeps its profile in when isolated by argument
+    var appProfilePath: URL {
+        profilePath ?? dataPath
+    }
+    
+    /// Apps isolated by argument keep everything in their profile folder; a re-signed copy would
+    /// only risk losing access to their keychain items
+    var canUsePrivateCopy: Bool {
+        effectiveIsolationMethod != .userDataDir && effectiveIsolationMethod != .profileArgument
+    }
+    
     /// The app bundle to launch: the private copy if there is one, otherwise the original
     var launchAppPath: URL {
         privateCopy?.path ?? targetAppPath
@@ -210,16 +225,16 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         
         // Slack uses --user-data-dir
         if bundleId.contains("slack") {
-            args.append("--user-data-dir=\(dataPath.path)")
+            args.append("--user-data-dir=\(appProfilePath.path)")
             return args
         }
         
         // Default behavior based on isolation method
         switch effectiveIsolationMethod {
         case .userDataDir:
-            args.append("--user-data-dir=\(dataPath.path)")
+            args.append("--user-data-dir=\(appProfilePath.path)")
         case .profileArgument:
-            args.append(contentsOf: ["-profile", dataPath.path])
+            args.append(contentsOf: ["-profile", appProfilePath.path])
         case .homeRedirection, .none:
             break
         }
@@ -330,6 +345,7 @@ extension AppInstance {
         case hardwareIDOverride
         case separatePreferences
         case privateCopy
+        case profilePath
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon

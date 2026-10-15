@@ -521,6 +521,16 @@ final class InstanceViewModel {
         }
     }
     
+    // MARK: - Profile Folder
+    
+    /// Point the app at an existing profile folder (nil = data folder). Applies at the next start.
+    func setProfileFolder(_ instance: AppInstance, to folder: URL?) async {
+        var updated = instance
+        updated.profilePath = folder
+        updated.touch()
+        await save(updated, context: "changing profile folder")
+    }
+    
     // MARK: - Hardware ID
     
     /// Report a separate hardware UUID to the app (or the real one again). Applies at the next start.

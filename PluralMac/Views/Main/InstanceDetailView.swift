@@ -250,6 +250,7 @@ struct InstanceDetailView: View {
     private var dataIsolationSection: some View {
         DetailSection(title: "Data Isolation") {
             DetailRow(label: "Method", value: instance.effectiveIsolationMethod.rawValue.capitalized)
+            profileFolderRows
             preferencesRows
             privateCopyRows
             deviceIDRows
@@ -310,6 +311,41 @@ struct InstanceDetailView: View {
     }
     
     @ViewBuilder
+    private var profileFolderRows: some View {
+        if !instance.canUsePrivateCopy {
+            DetailRow(label: "Profile Folder", value: instance.profilePath?.path ?? "Data folder")
+            HStack(spacing: 8) {
+                Button("Use Existing Profile...") {
+                    chooseProfileFolder()
+                }
+                if instance.profilePath != nil {
+                    Button("Use Data Folder") {
+                        Task { await viewModel.setProfileFolder(instance, to: nil) }
+                    }
+                }
+            }
+            .disabled(isRunning)
+            Text("The app keeps its whole profile here (--user-data-dir). PluralMac Plus never writes into an existing profile; only the app does. Don't run the same profile from two places at once.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func chooseProfileFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.directoryURL = instance.profilePath ?? FileManager.default.homeDirectoryForCurrentUser
+        panel.prompt = "Use Profile"
+        panel.message = "Choose the folder the app already uses as its profile (for example the one passed as --user-data-dir)."
+        if panel.runModal() == .OK, let url = panel.url {
+            Task { await viewModel.setProfileFolder(instance, to: url) }
+        }
+    }
+    
+    @ViewBuilder
     private var privateCopyRows: some View {
         if let copy = instance.privateCopy {
             DetailRow(label: "App", value: "Private copy, made from version \(copy.originalVersion)")
@@ -334,7 +370,7 @@ struct InstanceDetailView: View {
                 }
             }
             .disabled(isRunning || isBuildingCopy)
-        } else if targetBlocksInjection {
+        } else if targetBlocksInjection && instance.canUsePrivateCopy {
             HStack(spacing: 8) {
                 Button("Use a Private Copy...") {
                     confirmPrivateCopy = true
