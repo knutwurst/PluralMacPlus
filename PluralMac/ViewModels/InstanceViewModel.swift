@@ -504,7 +504,8 @@ final class InstanceViewModel {
         instancesMovingData.insert(instance.id)
         defer { instancesMovingData.remove(instance.id) }
         
-        let source = instance.dataPath
+        // Apps isolated by argument keep their data in the profile folder, so that is what moves
+        let source = instance.isolationRoot
         let folderName = instance.name
         let isRunning = await directLauncher.isRunning(instance.id)
         
@@ -515,13 +516,33 @@ final class InstanceViewModel {
             }.value
             
             var updated = instance
-            updated.dataPath = destination
+            Self.repoint(&updated, from: source, to: destination)
             updated.touch()
             try await updateInstance(updated)
             
             logger.info("Moved data folder of \(instance.name) to \(destination.path)")
         } catch {
             handleError(error, context: "moving data folder")
+        }
+    }
+    
+    /// The folder "Delete Shortcut & Data" removes; never a profile folder the user chose
+    nonisolated static func dataFolderToDelete(for instance: AppInstance) -> URL? {
+        if let profile = instance.profilePath,
+           profile.standardizedFileURL.path == instance.dataPath.standardizedFileURL.path {
+            return nil
+        }
+        return instance.dataPath
+    }
+    
+    /// Points data and profile folder that were at `source` to `destination`
+    nonisolated static func repoint(_ instance: inout AppInstance, from source: URL, to destination: URL) {
+        let moved = source.standardizedFileURL.path
+        if instance.dataPath.standardizedFileURL.path == moved {
+            instance.dataPath = destination
+        }
+        if instance.profilePath?.standardizedFileURL.path == moved {
+            instance.profilePath = destination
         }
     }
     
@@ -607,12 +628,12 @@ final class InstanceViewModel {
             _ = await directLauncher.terminate(instance.id)
         }
         
-        // Delete data directory if requested
-        if deleteData {
+        // Move the data folder to the Trash if requested, so a wrong click can be undone
+        if deleteData, let folder = Self.dataFolderToDelete(for: instance) {
             let fileManager = FileManager.default
-            if fileManager.fileExists(atPath: instance.dataPath.path) {
-                try fileManager.removeItem(at: instance.dataPath)
-                logger.debug("Deleted data at: \(instance.dataPath.path)")
+            if fileManager.fileExists(atPath: folder.path) {
+                try fileManager.trashItem(at: folder, resultingItemURL: nil)
+                logger.debug("Moved data to the Trash: \(folder.path)")
             }
         }
         
@@ -727,7 +748,7 @@ final class InstanceViewModel {
     
     /// Reveal instance data directory in Finder
     func revealDataInFinder(_ instance: AppInstance) {
-        LaunchServicesHelper.revealInFinder(instance.dataPath)
+        LaunchServicesHelper.revealInFinder(instance.isolationRoot)
     }
     
     // MARK: - Duplicate

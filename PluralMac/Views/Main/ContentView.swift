@@ -155,7 +155,7 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Do you want to delete just the shortcut, or also delete all isolated data?")
+            Text("Do you want to delete just the shortcut, or also move its data folder to the Trash? A profile folder you chose yourself is kept.")
         }
     }
     

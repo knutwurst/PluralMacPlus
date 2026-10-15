@@ -94,7 +94,7 @@ struct InstanceListView: View {
                     }
                 }
             } label: {
-                Label("Move Data Folder...", systemImage: "externaldrive")
+                Label(instance.redirectsHome ? "Move Data Folder..." : "Move Profile Folder...", systemImage: "externaldrive")
             }
             .disabled(RunningInstancesManager.shared.isRunning(instance.id) || viewModel.instancesMovingData.contains(instance.id))
             

@@ -40,4 +40,36 @@ final class ProfileFolderTests: XCTestCase {
         native.isolationMethodOverride = .homeRedirection
         XCTAssertTrue(native.canUsePrivateCopy)
     }
+
+    func testMovingDataOfProfileAppMovesTheProfileFolder() throws {
+        var instance = try makeElectronInstance()
+        instance.profilePath = URL(fileURLWithPath: "/tmp/existing profile")
+        XCTAssertEqual(instance.isolationRoot.path, "/tmp/existing profile")
+
+        InstanceViewModel.repoint(&instance, from: instance.isolationRoot, to: URL(fileURLWithPath: "/Volumes/X/Work Profile"))
+
+        XCTAssertEqual(instance.profilePath?.path, "/Volumes/X/Work Profile")
+        XCTAssertEqual(instance.dataPath.path, "/tmp/pmp-home")
+    }
+
+    func testMovingSharedDataAndProfileFolderKeepsThemTogether() throws {
+        var instance = try makeElectronInstance()
+        instance.profilePath = instance.dataPath
+
+        InstanceViewModel.repoint(&instance, from: instance.isolationRoot, to: URL(fileURLWithPath: "/Volumes/X/Work Profile"))
+
+        XCTAssertEqual(instance.profilePath?.path, "/Volumes/X/Work Profile")
+        XCTAssertEqual(instance.dataPath.path, "/Volumes/X/Work Profile")
+    }
+
+    func testDeletingDataNeverTouchesAChosenProfile() throws {
+        var instance = try makeElectronInstance()
+        XCTAssertEqual(InstanceViewModel.dataFolderToDelete(for: instance)?.path, "/tmp/pmp-home")
+
+        instance.profilePath = instance.dataPath
+        XCTAssertNil(InstanceViewModel.dataFolderToDelete(for: instance))
+
+        instance.profilePath = URL(fileURLWithPath: "/tmp/existing profile")
+        XCTAssertEqual(InstanceViewModel.dataFolderToDelete(for: instance)?.path, "/tmp/pmp-home")
+    }
 }

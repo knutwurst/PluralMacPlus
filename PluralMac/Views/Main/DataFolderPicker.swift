@@ -16,7 +16,7 @@ enum DataFolderPicker {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
-        panel.directoryURL = instance.dataPath.deletingLastPathComponent()
+        panel.directoryURL = instance.isolationRoot.deletingLastPathComponent()
         panel.prompt = "Move Here"
         panel.message = "Choose where to move the data of \"\(instance.name)\". A folder named after the instance will be created there."
 

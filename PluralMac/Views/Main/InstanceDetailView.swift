@@ -115,7 +115,7 @@ struct InstanceDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Do you want to delete just the shortcut, or also delete all isolated data?")
+            Text("Do you want to delete just the shortcut, or also move its data folder to the Trash? A profile folder you chose yourself is kept.")
         }
         .alert("Duplicate Instance", isPresented: $showDuplicateSheet) {
             TextField("New Name", text: $duplicateName)
@@ -254,22 +254,25 @@ struct InstanceDetailView: View {
             preferencesRows
             privateCopyRows
             deviceIDRows
-            DetailRow(label: "Data Path", value: instance.dataPath.path)
-                .contextMenu {
-                    Button("Copy Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(instance.dataPath.path, forType: .string)
+            // Apps isolated by argument only use their profile folder (shown above)
+            if instance.redirectsHome {
+                DetailRow(label: "Data Path", value: instance.dataPath.path)
+                    .contextMenu {
+                        Button("Copy Path") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(instance.dataPath.path, forType: .string)
+                        }
+                        Button("Show in Finder") {
+                            viewModel.revealDataInFinder(instance)
+                        }
+                        Button("Move Data Folder...") {
+                            moveDataFolder()
+                        }
+                        .disabled(isRunning || isMovingData)
                     }
-                    Button("Show in Finder") {
-                        viewModel.revealDataInFinder(instance)
-                    }
-                    Button("Move Data Folder...") {
-                        moveDataFolder()
-                    }
-                    .disabled(isRunning || isMovingData)
-                }
+            }
             HStack(spacing: 8) {
-                Button("Move Data Folder...") {
+                Button(instance.redirectsHome ? "Move Data Folder..." : "Move Profile Folder...") {
                     moveDataFolder()
                 }
                 .disabled(isRunning || isMovingData)
@@ -312,16 +315,27 @@ struct InstanceDetailView: View {
     
     @ViewBuilder
     private var profileFolderRows: some View {
-        if !instance.canUsePrivateCopy {
-            DetailRow(label: "Profile Folder", value: instance.profilePath?.path ?? "Data folder")
+        if !instance.redirectsHome {
+            DetailRow(label: "Profile Folder", value: instance.appProfilePath.path)
+                .contextMenu {
+                    Button("Copy Path") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(instance.appProfilePath.path, forType: .string)
+                    }
+                    Button("Show in Finder") {
+                        LaunchServicesHelper.revealInFinder(instance.appProfilePath)
+                    }
+                }
             HStack(spacing: 8) {
                 Button("Use Existing Profile...") {
                     chooseProfileFolder()
                 }
-                if instance.profilePath != nil {
-                    Button("Use Data Folder") {
+                if let profile = instance.profilePath,
+                   profile.standardizedFileURL.path != instance.dataPath.standardizedFileURL.path {
+                    Button("Use Instance Folder") {
                         Task { await viewModel.setProfileFolder(instance, to: nil) }
                     }
+                    .help("Starts with the profile in \(instance.dataPath.path)")
                 }
             }
             .disabled(isRunning)
