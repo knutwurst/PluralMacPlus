@@ -16,6 +16,8 @@ Better isolation. The original only set `HOME`, which macOS's own path functions
 
 Private copies. For apps that don't allow the library, an instance can run from its own copy of the app instead ("Use a Private Copy…"). PluralMac Plus clones the app (APFS, so it takes almost no disk space), renames it to the instance, gives it the launcher icon and signs it again without Hardened Runtime. Separate preferences then work, and Dock and Cmd-Tab show the instance name. The copy starts through a small script that sets up the instance first, so you can keep it in the Dock ("Options → Keep in Dock") and start it from there, from Finder or from Spotlight. Updates of the original don't reach the copy; when the original changes version, PluralMac Plus offers to recreate it. Apps that depend on iCloud, push notifications or keychain groups may not start from a copy.
 
+Apps with their own profile folder. Chromium, Electron and Firefox apps keep everything in the folder passed as `--user-data-dir` or `-profile`. You can point an instance at a profile that already exists ("Use Existing Profile…"); PluralMac Plus passes the path and never writes into it. These apps run with your normal home folder, because a redirected `HOME` hides the login keychain from them: they can't store new keys there, and Electron apps then keep their database key unencrypted. A re-signed copy would risk losing access to keychain items too, so instead they get their own Dock app ("Use Own Dock Name and Icon"): a small bundle with the instance's name and icon whose script starts the original binary. The Dock shows the instance name and icon, the original app stays untouched and keeps its updates, and you can keep the Dock app in the Dock. One limit: macOS still counts the running instance as the original app. If an instance is already running and you then open the original app itself, macOS only brings the instance to the front. Start the original first, or give it an instance of its own.
+
 Separate device ID. Some apps identify the Mac by its hardware UUID, so two instances look like the same device to the app's server. The server then only talks to one of them. Turn on "Separate device ID" for an instance and it sees its own UUID; "New Device ID…" hands out a fresh one. It works for apps that ask `ioreg` through the shell, which covers the Flutter plugins I've looked at.
 
 Running instances. Double-click an instance to start it, or to bring it to the front and restore a minimized window if it's already running. After restarting PluralMac Plus it still knows which instances are running, including ones started through a launcher.
@@ -48,11 +50,11 @@ Everything else lives in the sidebar's context menu and the detail view: rename,
 
 ## How it works
 
-PluralMac Plus starts the original app via `NSWorkspace.openApplication` with `createsNewApplicationInstance`, and sets `HOME`, `CFFIXED_USER_HOME` and the `XDG_*` variables to the instance's data folder. For apps that support it, it adds the matching argument: `--user-data-dir` for Chromium and Electron apps, `-profile` for Firefox, `--mu` for Spotify. Desktop, Documents, Downloads and a few other folders inside the data folder link back to your real ones.
+PluralMac Plus starts the original app via `NSWorkspace.openApplication` with `createsNewApplicationInstance`, and sets `HOME`, `CFFIXED_USER_HOME` and the `XDG_*` variables to the instance's data folder. Desktop, Documents, Downloads and a few other folders inside the data folder link back to your real ones. Apps with a profile argument get that instead and keep your `HOME`: `--user-data-dir` for Chromium and Electron apps, `-profile` for Firefox. Spotify gets `--mu`.
 
-A launcher is just a bundle with a shell script that runs `open -n -a <app> --env … --args …`.
+A launcher is just a bundle with a shell script that runs `open -n -a <app> --env … --args …`. A Dock app is a bundle with its own bundle ID whose script exports the environment and `exec`s the original binary with the instance's arguments.
 
-To find running instances, PluralMac Plus reads the `HOME` variable of the app's running processes and compares it with the instance folders.
+To find running instances, PluralMac Plus reads the environment and arguments of the app's running processes and compares `HOME` or the profile argument with the instances.
 
 ## What works and what doesn't
 
