@@ -4,6 +4,11 @@
 
 Run the same Mac app more than once, each copy with its own login, settings and cache.
 
+<p align="center">
+  If you like what I do, you can buy me a coffee*: <a href="https://paypal.me/oliverkoester"><img src="https://img.shields.io/badge/Donate-PayPal-0070ba?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal" align="absmiddle"></a><br>
+  <sub>*It doesn't have to be a big donation. A few cents show me who uses the tool and cares about where it goes next. That keeps me motivated, and I know I'm not coding for the bin ;)</sub>
+</p>
+
 This is my fork of [PluralMac](https://github.com/Devrax/PluralMac) by Rafael Alexander Mejia Blanco. I started it because I wanted two accounts of the same app on one Mac, with the data on an encrypted drive, and I didn't want to keep juggling symlinks for that. PluralMac Plus reads the same `~/Library/PluralMac/instances.json` as the original, so existing instances keep working.
 
 ## What I added

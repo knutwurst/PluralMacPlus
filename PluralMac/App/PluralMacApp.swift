@@ -106,6 +106,12 @@ struct PluralMacCommands: Commands {
             .keyboardShortcut("e", modifiers: [.command, .shift])
         }
         
+        CommandGroup(after: .help) {
+            Button("Buy Me a Coffee…") {
+                Donation.open()
+            }
+        }
+        
         // Instance actions
         CommandMenu("Instance") {
             Button("Launch Selected") {

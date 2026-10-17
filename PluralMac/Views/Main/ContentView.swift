@@ -210,20 +210,32 @@ struct ContentView: View {
     // MARK: - Sidebar Toolbar
     
     private var sidebarToolbar: some View {
-        HStack {
-            Button {
-                showingCreateSheet = true
-            } label: {
-                Label("New Instance", systemImage: "plus")
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button {
+                    showingCreateSheet = true
+                } label: {
+                    Label("New Instance", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                
+                Spacer()
+                
+                Text("\(viewModel.instanceCount) instance\(viewModel.instanceCount == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
             
-            Spacer()
-            
-            Text("\(viewModel.instanceCount) instance\(viewModel.instanceCount == 1 ? "" : "s")")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Button {
+                Donation.open()
+            } label: {
+                Label("Buy me a coffee", systemImage: "cup.and.saucer")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Support the development with a PayPal donation")
         }
         .padding()
         .background(.bar)

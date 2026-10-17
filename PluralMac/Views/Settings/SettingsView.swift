@@ -188,6 +188,20 @@ struct AboutSettingsTab: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             
+            VStack(spacing: 6) {
+                Text("If you like what I do, you can buy me a coffee.")
+                    .font(.callout)
+                Button("Donate with PayPal") {
+                    Donation.open()
+                }
+                Text(Donation.note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 360)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
             Spacer()
             
             HStack {
