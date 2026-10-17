@@ -60,17 +60,23 @@ struct InstanceDetailView: View {
                 
                 Divider()
                 
-                dataIsolationSection
+                storageSection
                 
                 Divider()
                 
-                iconSection
+                dockSection
                 
                 Divider()
                 
-                launcherSection
+                separationSection
                 
                 Divider()
+                
+                if showsLauncherSection {
+                    launcherSection
+                    
+                    Divider()
+                }
                 
                 launchOptionsSection
                 
@@ -245,104 +251,68 @@ struct InstanceDetailView: View {
         instance.targetAppPath.deletingPathExtension().lastPathComponent
     }
     
-    // MARK: - Data Isolation Section
+    // MARK: - Storage Section
     
-    private var dataIsolationSection: some View {
-        DetailSection(title: "Data Isolation") {
-            DetailRow(label: "Method", value: instance.effectiveIsolationMethod.rawValue.capitalized)
-            profileFolderRows
-            preferencesRows
-            privateCopyRows
-            deviceIDRows
-            // Apps isolated by argument only use their profile folder (shown above)
-            if instance.redirectsHome {
-                DetailRow(label: "Data Path", value: instance.dataPath.path)
-                    .contextMenu {
-                        Button("Copy Path") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(instance.dataPath.path, forType: .string)
-                        }
-                        Button("Show in Finder") {
-                            viewModel.revealDataInFinder(instance)
-                        }
-                        Button("Move Data Folder...") {
-                            moveDataFolder()
-                        }
-                        .disabled(isRunning || isMovingData)
+    private var storageSection: some View {
+        DetailSection(title: "Storage") {
+            DetailRow(label: instance.redirectsHome ? "Data Folder" : "Profile Folder", value: instance.isolationRoot.path)
+                .contextMenu {
+                    Button("Copy Path") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(instance.isolationRoot.path, forType: .string)
                     }
-            }
+                    Button("Show in Finder") {
+                        viewModel.revealDataInFinder(instance)
+                    }
+                }
             HStack(spacing: 8) {
-                Button(instance.redirectsHome ? "Move Data Folder..." : "Move Profile Folder...") {
+                Button("Show in Finder") {
+                    viewModel.revealDataInFinder(instance)
+                }
+                Button("Move...") {
                     moveDataFolder()
                 }
                 .disabled(isRunning || isMovingData)
-                
+                if !instance.redirectsHome {
+                    Button("Use Other Profile...") {
+                        chooseProfileFolder()
+                    }
+                    .disabled(isRunning)
+                    if let profile = instance.profilePath,
+                       profile.standardizedFileURL.path != instance.dataPath.standardizedFileURL.path {
+                        Button("Use Instance Folder") {
+                            Task { await viewModel.setProfileFolder(instance, to: nil) }
+                        }
+                        .disabled(isRunning)
+                        .help("Starts with the profile in \(instance.dataPath.path)")
+                    }
+                }
                 if isMovingData {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Moving data...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if isRunning {
-                    Text("Quit the instance to move its data.")
+                    Text("Moving...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            DetailRow(label: "Shortcut Path", value: instance.shortcutPath.path)
-                .contextMenu {
-                    Button("Copy Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(instance.shortcutPath.path, forType: .string)
-                    }
-                    Button("Show in Finder") {
-                        viewModel.revealInFinder(instance)
-                    }
-                }
-        }
-    }
-    
-    // MARK: - Device ID
-    
-    /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
-    private var targetBlocksInjection: Bool {
-        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.codeAppPath)
-    }
-    
-    private var isBuildingCopy: Bool {
-        viewModel.instancesBuildingCopy.contains(instance.id)
-    }
-    
-    @ViewBuilder
-    private var profileFolderRows: some View {
-        if !instance.redirectsHome {
-            DetailRow(label: "Profile Folder", value: instance.appProfilePath.path)
-                .contextMenu {
-                    Button("Copy Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(instance.appProfilePath.path, forType: .string)
-                    }
-                    Button("Show in Finder") {
-                        LaunchServicesHelper.revealInFinder(instance.appProfilePath)
-                    }
-                }
-            HStack(spacing: 8) {
-                Button("Use Existing Profile...") {
-                    chooseProfileFolder()
-                }
-                if let profile = instance.profilePath,
-                   profile.standardizedFileURL.path != instance.dataPath.standardizedFileURL.path {
-                    Button("Use Instance Folder") {
-                        Task { await viewModel.setProfileFolder(instance, to: nil) }
-                    }
-                    .help("Starts with the profile in \(instance.dataPath.path)")
-                }
-            }
-            .disabled(isRunning)
-            Text("The app keeps its whole profile here (--user-data-dir) and runs with your normal home folder, so it can use the login keychain. PluralMac Plus never writes into an existing profile; only the app does. Don't run the same profile from two places at once.")
+            Text(storageCaption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+    
+    private var storageCaption: String {
+        var text: String
+        if instance.redirectsHome {
+            text = "\(targetAppName) runs with this folder as its home folder, so its data, caches and settings stay in here."
+        } else {
+            let argument = instance.isolationArguments.first?.components(separatedBy: "=").first ?? "--user-data-dir"
+            text = "\(targetAppName) keeps its whole profile in this folder (\(argument)) and otherwise runs with your normal home folder, so it can use the login keychain. PluralMac Plus never writes into the profile. Don't open the same profile from two places at once."
+        }
+        if isRunning {
+            text += " Quit the instance to move it."
+        }
+        return text
     }
     
     private func chooseProfileFolder() {
@@ -359,46 +329,52 @@ struct InstanceDetailView: View {
         }
     }
     
+    // MARK: - Dock & Icon Section
+    
+    /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
+    private var targetBlocksInjection: Bool {
+        !PreferencesIsolation.allowsLibraryInjection(appAt: instance.codeAppPath)
+    }
+    
+    private var isBuildingCopy: Bool {
+        viewModel.instancesBuildingCopy.contains(instance.id)
+    }
+    
+    private var dockSection: some View {
+        DetailSection(title: "Dock & Icon") {
+            dockAppRows
+            
+            LauncherIconColorPicker(
+                baseIcon: launcherBaseIcon,
+                hue: $launcherIconHue
+            )
+            if launcherIconHue != instance.launcherIconHue {
+                HStack(spacing: 8) {
+                    Button("Apply Color") {
+                        Task {
+                            await viewModel.setLauncherIconHue(instance, hue: launcherIconHue)
+                        }
+                    }
+                    Button("Revert") {
+                        launcherIconHue = instance.launcherIconHue
+                    }
+                }
+            }
+            Text(iconCaption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { launcherIconHue = instance.launcherIconHue }
+        .onChange(of: instance.id) { _, _ in launcherIconHue = instance.launcherIconHue }
+        .onChange(of: instance.launcherIconHue) { _, newValue in launcherIconHue = newValue }
+    }
+    
     @ViewBuilder
-    private var privateCopyRows: some View {
-        if let starter = instance.privateCopy, starter.isStarter {
-            DetailRow(label: "App", value: "Own Dock app \"\(starter.path.deletingPathExtension().lastPathComponent)\"")
-                .contextMenu {
-                    Button("Show in Finder") { LaunchServicesHelper.revealInFinder(starter.path) }
-                }
-            HStack(spacing: 8) {
-                Button("Show in Finder") {
-                    LaunchServicesHelper.revealInFinder(starter.path)
-                }
-                Button("Remove Own Dock App") {
-                    Task { await viewModel.removePrivateCopy(from: instance) }
-                }
-                .help("Moves the Dock app to the Trash; the instance then shows as \(targetAppName) again")
-                if isBuildingCopy {
-                    ProgressView().controlSize(.small)
-                }
-            }
-            .disabled(isRunning || isBuildingCopy)
-            Text("Starts \(targetAppName) with this instance's profile, but the Dock shows the instance name and icon. \(targetAppName) itself stays untouched and keeps its updates. Keep it in the Dock (Options → Keep in Dock) to start the instance from there.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else if !instance.canUsePrivateCopy {
-            HStack(spacing: 8) {
-                Button("Use Own Dock Name and Icon") {
-                    Task { await viewModel.createPrivateCopy(for: instance) }
-                }
-                .disabled(isRunning || isBuildingCopy)
-                if isBuildingCopy {
-                    ProgressView().controlSize(.small)
-                }
-            }
-            Text(isRunning
-                 ? "Quit the instance first. Then it gets a small app of its own that shows the instance name and icon in the Dock."
-                 : "Creates a small app named \"\(instance.name)\" that starts \(targetAppName) with this profile. The Dock then shows the instance name and icon; \(targetAppName) itself is not copied or changed.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else if let copy = instance.privateCopy {
-            DetailRow(label: "App", value: "Private copy, made from version \(copy.originalVersion)")
+    private var dockAppRows: some View {
+        if let copy = instance.privateCopy {
+            DetailRow(label: copy.isStarter ? "Dock App" : "Private Copy",
+                      value: copy.isStarter ? copy.path.deletingPathExtension().lastPathComponent
+                                            : "Made from version \(copy.originalVersion)")
                 .contextMenu {
                     Button("Show in Finder") { LaunchServicesHelper.revealInFinder(copy.path) }
                 }
@@ -409,10 +385,15 @@ struct InstanceDetailView: View {
                     .foregroundStyle(.orange)
             }
             HStack(spacing: 8) {
-                Button("Recreate Copy") {
-                    Task { await viewModel.createPrivateCopy(for: instance) }
+                Button("Show in Finder") {
+                    LaunchServicesHelper.revealInFinder(copy.path)
                 }
-                Button("Use Original App") {
+                if !copy.isStarter {
+                    Button("Recreate Copy") {
+                        Task { await viewModel.createPrivateCopy(for: instance) }
+                    }
+                }
+                Button(copy.isStarter ? "Remove Dock App" : "Use Original App") {
                     Task { await viewModel.removePrivateCopy(from: instance) }
                 }
                 if isBuildingCopy {
@@ -420,7 +401,27 @@ struct InstanceDetailView: View {
                 }
             }
             .disabled(isRunning || isBuildingCopy)
-        } else if targetBlocksInjection && instance.canUsePrivateCopy {
+            Text(copy.isStarter
+                 ? "The Dock shows \"\(instance.name)\" with the icon below. It starts the original \(targetAppName), which keeps its updates. Keep it in the Dock (Options → Keep in Dock) to start the instance from there."
+                 : "The instance runs from its own copy of \(targetAppName), so the Dock and Cmd-Tab show \"\(instance.name)\" with the icon below. Keep it in the Dock (Options → Keep in Dock) to start the instance from there.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if !instance.canUsePrivateCopy {
+            DetailRow(label: "Dock App", value: "None, the Dock shows \(targetAppName)")
+            HStack(spacing: 8) {
+                Button("Create Dock App") {
+                    Task { await viewModel.createPrivateCopy(for: instance) }
+                }
+                .disabled(isRunning || isBuildingCopy)
+                if isBuildingCopy {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            Text("A small app named \"\(instance.name)\" that starts \(targetAppName) with this profile. The Dock then shows the instance name and the icon below; \(targetAppName) itself is not copied or changed." + (isRunning ? " Quit the instance first." : ""))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if targetBlocksInjection {
+            DetailRow(label: "Private Copy", value: "None, the Dock shows \(targetAppName)")
             HStack(spacing: 8) {
                 Button("Use a Private Copy...") {
                     confirmPrivateCopy = true
@@ -441,6 +442,37 @@ struct InstanceDetailView: View {
             } message: {
                 Text("PluralMac Plus copies the app, names it \"\(instance.name)\" and signs the copy without Hardened Runtime, so preferences and device ID can be separated. The copy shows the instance name in the Dock.\n\nUpdates of the original don't reach the copy; recreate it after updating. macOS may ask again for camera or microphone access. Apps that use iCloud, push notifications or keychain groups may not start from a copy.")
             }
+            Text("Gives the instance its own name and icon in the Dock and makes separate preferences possible.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private var iconCaption: String {
+        if instance.privateCopy != nil {
+            return isRunning
+                ? "A new color shows in the Dock after the instance quits."
+                : "Shown in the Dock, in this window and on the launcher app."
+        }
+        return "Shown in this window and on the launcher app."
+    }
+    
+    /// Launcher icon in its original colors
+    private var launcherBaseIcon: NSImage {
+        var untinted = instance
+        untinted.launcherIconHue = nil
+        return viewModel.launcherIcon(for: untinted)
+    }
+    
+    // MARK: - Separation Section
+    
+    private var separationSection: some View {
+        DetailSection(title: "Separation") {
+            // Profile-based apps keep their settings in the profile folder anyway
+            if instance.redirectsHome {
+                preferencesRows
+            }
+            deviceIDRows
         }
     }
     
@@ -455,7 +487,7 @@ struct InstanceDetailView: View {
         .disabled(targetBlocksInjection && instance.separatePreferences != true)
         
         Text(targetBlocksInjection
-             ? "Not available for the original: it uses Hardened Runtime and doesn't allow PluralMac Plus to redirect its preferences. Chromium and Electron apps keep their real settings in the profile folder, which is separated anyway. Otherwise you can run the instance from a private copy."
+             ? "Not available: \(targetAppName) uses Hardened Runtime and doesn't let PluralMac Plus redirect its preferences. A private copy (Dock & Icon) makes it possible."
              : "Keeps the app's settings (UserDefaults) in the data folder instead of sharing them with other instances. Applies after restarting the instance.")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -500,20 +532,23 @@ struct InstanceDetailView: View {
     
     // MARK: - Launcher Section
     
+    /// Only shown when the instance has no Dock app or private copy, or still has an old launcher
+    private var showsLauncherSection: Bool {
+        instance.privateCopy == nil || viewModel.hasLauncher(instance)
+    }
+    
     private var launcherSection: some View {
         DetailSection(title: "Launcher App") {
-            if let copy = instance.privateCopy {
-                Text("Not needed: this instance runs from its own \(copy.isStarter ? "Dock app" : "copy of the app"), which starts the instance by itself. Keep it in the Dock (Options → Keep in Dock) or open it from Finder or Spotlight.")
+            if instance.privateCopy != nil {
+                Text("Not needed anymore: the instance's own app in the Dock starts it by itself.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if viewModel.hasLauncher(instance) {
-                    Button("Remove Launcher", role: .destructive) {
-                        Task {
-                            await viewModel.removeLauncher(for: instance)
-                        }
+                Button("Remove Launcher", role: .destructive) {
+                    Task {
+                        await viewModel.removeLauncher(for: instance)
                     }
-                    .help("Moves the launcher app to the Trash")
                 }
+                .help("Moves the launcher app to the Trash")
             } else if viewModel.hasLauncher(instance), let launcher = instance.launcherPath {
                 DetailRow(label: "Location", value: launcher.path)
                     .contextMenu {
@@ -541,7 +576,7 @@ struct InstanceDetailView: View {
                     .help("Moves the launcher app to the Trash")
                 }
             } else {
-                Text("A small app named \"\(instance.name)\" that starts this instance directly, e.g. from the Dock, Launchpad or Spotlight.")
+                Text("A small app named \"\(instance.name)\" that starts this instance without PluralMac Plus, e.g. from Spotlight or Launchpad. While the instance runs, the Dock still shows the original app.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("Create Launcher App...") {
@@ -549,57 +584,6 @@ struct InstanceDetailView: View {
                 }
             }
         }
-    }
-    
-    // MARK: - App Icon Section
-    
-    private var iconSection: some View {
-        DetailSection(title: "App Icon") {
-            LauncherIconColorPicker(
-                baseIcon: launcherBaseIcon,
-                hue: $launcherIconHue
-            )
-            
-            if launcherIconHue != instance.launcherIconHue {
-                HStack(spacing: 8) {
-                    Button("Apply Color") {
-                        Task {
-                            await viewModel.setLauncherIconHue(instance, hue: launcherIconHue)
-                        }
-                    }
-                    Button("Revert") {
-                        launcherIconHue = instance.launcherIconHue
-                    }
-                }
-            }
-            
-            Text(iconCaption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .onAppear { launcherIconHue = instance.launcherIconHue }
-        .onChange(of: instance.id) { _, _ in launcherIconHue = instance.launcherIconHue }
-        .onChange(of: instance.launcherIconHue) { _, newValue in launcherIconHue = newValue }
-    }
-    
-    private var iconCaption: String {
-        if let copy = instance.privateCopy {
-            let owner = copy.isStarter ? "the instance's Dock app" : "the app copy in the Dock and Cmd-Tab"
-            return isRunning
-                ? "Used by \(owner). A new color applies after the instance quits."
-                : "Used by \(owner)" + (viewModel.hasLauncher(instance) ? " and by the launcher app." : ".")
-        }
-        if !instance.canUsePrivateCopy {
-            return "Used by the launcher app. While the instance runs, the Dock shows the original app's icon; with its own Dock name and icon (Data Isolation) it shows this one."
-        }
-        return "Used by the launcher app. While the instance runs, the Dock shows the original app's icon; a private copy shows this one."
-    }
-    
-    /// Launcher icon in its original colors
-    private var launcherBaseIcon: NSImage {
-        var untinted = instance
-        untinted.launcherIconHue = nil
-        return viewModel.launcherIcon(for: untinted)
     }
     
     // MARK: - Launch Options Section
@@ -682,15 +666,15 @@ struct InstanceDetailView: View {
         ToolbarItemGroup(placement: .primaryAction) {
             Menu {
                 Button {
-                    viewModel.revealInFinder(instance)
+                    viewModel.revealDataInFinder(instance)
                 } label: {
-                    Label("Show Shortcut in Finder", systemImage: "folder")
+                    Label(instance.redirectsHome ? "Show Data Folder" : "Show Profile Folder", systemImage: "folder.badge.gearshape")
                 }
                 
                 Button {
-                    viewModel.revealDataInFinder(instance)
+                    LaunchServicesHelper.revealInFinder(instance.targetAppPath)
                 } label: {
-                    Label("Show Data in Finder", systemImage: "folder.badge.gearshape")
+                    Label("Show \(targetAppName)", systemImage: "folder")
                 }
             } label: {
                 Label("Finder", systemImage: "folder")
@@ -715,7 +699,7 @@ struct InstanceDetailView: View {
                 Button {
                     moveDataFolder()
                 } label: {
-                    Label("Move Data Folder...", systemImage: "externaldrive")
+                    Label(instance.redirectsHome ? "Move Data Folder..." : "Move Profile Folder...", systemImage: "externaldrive")
                 }
                 .disabled(isRunning || isMovingData)
                 

@@ -76,15 +76,9 @@ struct InstanceListView: View {
             Divider()
             
             Button {
-                viewModel.revealInFinder(instance)
-            } label: {
-                Label("Show in Finder", systemImage: "folder")
-            }
-            
-            Button {
                 viewModel.revealDataInFinder(instance)
             } label: {
-                Label("Show Data Folder", systemImage: "folder.badge.gearshape")
+                Label(instance.redirectsHome ? "Show Data Folder" : "Show Profile Folder", systemImage: "folder.badge.gearshape")
             }
             
             Button {
