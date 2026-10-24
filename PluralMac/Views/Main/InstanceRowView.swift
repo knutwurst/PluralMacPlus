@@ -9,10 +9,7 @@
 import SwiftUI
 import AppKit
 
-/// A single row in the instance list showing instance icon, name, and target app.
 struct InstanceRowView: View {
-    
-    // MARK: - Properties
     
     let instance: AppInstance
     @Bindable var viewModel: InstanceViewModel
@@ -22,26 +19,20 @@ struct InstanceRowView: View {
     
     @ObservedObject private var runningManager = RunningInstancesManager.shared
     
-    /// Check if this instance is running
     private var isRunning: Bool {
         runningManager.isRunning(instance.id)
     }
     
-    // MARK: - Body
-    
     var body: some View {
         HStack(spacing: 12) {
-            // App Icon
             iconView
             
-            // Instance Info
             VStack(alignment: .leading, spacing: 2) {
                 Text(instance.name)
                     .font(.headline)
                     .lineLimit(1)
                 
                 HStack(spacing: 4) {
-                    // App type indicator
                     compatibilityIndicator
                     
                     Text(targetAppName)
@@ -53,7 +44,6 @@ struct InstanceRowView: View {
             
             Spacer()
             
-            // Running indicator
             if isRunning {
                 Circle()
                     .fill(.green)
@@ -61,7 +51,6 @@ struct InstanceRowView: View {
                     .help("Running")
             }
             
-            // Quick action button (shown on hover)
             if isHovering {
                 if isRunning {
                     Button {
@@ -101,8 +90,6 @@ struct InstanceRowView: View {
         }
     }
     
-    // MARK: - Icon View
-    
     @ViewBuilder
     private var iconView: some View {
         Group {
@@ -120,8 +107,6 @@ struct InstanceRowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
     
-    // MARK: - Compatibility Indicator
-    
     private var compatibilityIndicator: some View {
         let level = instance.targetAppType.compatibilityLevel
         
@@ -131,18 +116,13 @@ struct InstanceRowView: View {
             .help(instance.targetAppType.displayName)
     }
 
-    
-    // MARK: - Computed Properties
-    
     private var targetAppName: String {
         instance.targetAppPath
             .deletingPathExtension()
             .lastPathComponent
     }
     
-    // MARK: - Icon Loading
-    
-    /// Changes whenever the icon source or color changes
+    // reloads the icon when its source or tint changes
     private var iconKey: String {
         "\(instance.customIconPath?.path ?? "")|\(instance.launcherIconHue ?? -1)"
     }
@@ -152,8 +132,6 @@ struct InstanceRowView: View {
         appIcon = viewModel.displayIcon(for: instance)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     let mockInstance = AppInstance(

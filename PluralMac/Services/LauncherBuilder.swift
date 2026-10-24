@@ -11,9 +11,9 @@ import CoreImage.CIFilterBuiltins
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Builds a tiny .app bundle that starts one instance directly, without PluralMac Plus running.
-/// The bundle only contains a shell script that calls `open -n -a <target> --env ... --args ...`,
-/// the same launch PluralMac Plus performs itself. The target app is never copied or modified.
+/// Builds a tiny .app that starts one instance without PluralMac Plus running. Inside is just a
+/// shell script doing the same `open -n -a <target> --env ... --args ...` the app does. The target
+/// app is never copied or modified.
 struct LauncherBuilder {
 
     /// Info.plist key that marks a bundle as launcher of a specific instance
@@ -40,13 +40,11 @@ struct LauncherBuilder {
 
     // MARK: - Bundle
 
-    /// Location of the launcher for `instance` inside `folder`
     func launcherURL(for instance: AppInstance, in folder: URL) -> URL {
         folder.appendingPathComponent("\(AppInstance.sanitizeFileName(instance.name)).app")
     }
 
-    /// Writes the launcher bundle into `folder` and returns its location.
-    /// An existing launcher of the same instance is replaced; any other existing app is left alone.
+    /// Replaces an older launcher of the same instance, refuses to touch any other app
     @discardableResult
     func build(for instance: AppInstance, in folder: URL) throws -> URL {
         let bundle = launcherURL(for: instance, in: folder)
@@ -89,7 +87,6 @@ struct LauncherBuilder {
         CGImageDestinationFinalize(destination)
     }
 
-    /// Returns `image` with its hue rotated by `hueDegrees`
     static func tinted(_ image: NSImage, hueDegrees: Double) -> NSImage {
         var rect = NSRect(origin: .zero, size: image.size)
         guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
@@ -117,7 +114,6 @@ struct LauncherBuilder {
         process.waitUntilExit()
     }
 
-    /// Whether the launcher script at `bundle` matches what would be generated for `instance` now
     func isUpToDate(_ bundle: URL, for instance: AppInstance) -> Bool {
         let executable = bundle.appendingPathComponent("Contents/MacOS/\(Self.executableName)")
         guard let current = try? String(contentsOf: executable, encoding: .utf8) else { return false }
@@ -137,7 +133,6 @@ struct LauncherBuilder {
         try trash(bundle)
     }
 
-    /// Whether `bundle` is a launcher created for the instance with `instanceID`
     static func isLauncher(at bundle: URL, for instanceID: UUID) -> Bool {
         let plistURL = bundle.appendingPathComponent("Contents/Info.plist")
         guard let data = try? Data(contentsOf: plistURL),
@@ -167,8 +162,7 @@ struct LauncherBuilder {
 
     // MARK: - Script
 
-    /// Shell script that starts the instance
-    /// - Parameter cleanAppleDouble: remove "._*" files before launch (nil = detect from the data volume)
+    /// `cleanAppleDouble`: nil = decide from the data volume
     func script(for instance: AppInstance, cleanAppleDouble: Bool? = nil) -> String {
         let q = Self.shellQuote
         var lines = [
@@ -191,8 +185,8 @@ struct LauncherBuilder {
         }
         lines.append(command.joined(separator: " \\\n    "))
 
-        // LaunchServices registers the private copy once it has started; unregister it a little later
-        // so bundle ID and URL schemes point to the original again
+        // LaunchServices grabs the copy once it runs; unregister it a bit later so bundle ID and
+        // URL schemes belong to the original again
         if let copy = instance.privateCopy, !copy.isStarter {
             lines.append("( /bin/sleep 3; \(q(PrivateCopyBuilder.lsregisterPath)) -u \(q(copy.path.path)) ) >/dev/null 2>&1 &")
         }
@@ -200,19 +194,18 @@ struct LauncherBuilder {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// Start script that a private app copy runs as its main executable, so Dock, Finder and
-    /// Spotlight launches set up the instance too. bash, because the device-ID override is an
-    /// exported function (sh can't export it, env(1) would lose DYLD_INSERT_LIBRARIES under SIP).
+    /// Main executable of a private copy, so Dock, Finder and Spotlight launches set up the instance
+    /// too. bash, not sh: the device-ID override is an exported function, which sh can't do, and
+    /// env(1) would lose DYLD_INSERT_LIBRARIES under SIP.
     func copyStartScript(for instance: AppInstance, executableName: String, cleanAppleDouble: Bool? = nil) -> String {
-        // LaunchServices registers the copy once it runs; unregister it a little later so bundle ID
-        // and URL schemes point to the original app again
+        // same LaunchServices unregister dance as in script(for:)
         let unregister = "( /bin/sleep 3; \(Self.shellQuote(PrivateCopyBuilder.lsregisterPath)) -u \"${0%/Contents/MacOS/*}\" ) >/dev/null 2>&1 &"
         return startScript(for: instance, title: "start script", extraLines: [unregister],
                            executable: "\"${0%/*}/\(executableName)\"", cleanAppleDouble: cleanAppleDouble)
     }
 
-    /// Main executable of a Dock starter: sets up the instance and execs the original app's binary.
-    /// The process keeps the starter's Dock name and icon while the original stays untouched.
+    /// Dock starter main executable: sets up the instance and execs the original binary. The process
+    /// keeps the starter's Dock name and icon, the original stays untouched.
     func starterScript(for instance: AppInstance, binary: URL, cleanAppleDouble: Bool? = nil) -> String {
         startScript(for: instance, title: "Dock starter", extraLines: [],
                     executable: Self.shellQuote(binary.path), cleanAppleDouble: cleanAppleDouble)
@@ -277,7 +270,6 @@ struct LauncherBuilder {
         return URL(fileURLWithPath: "/Volumes").appendingPathComponent(components[2])
     }
 
-    /// Single-quotes a string for /bin/sh
     static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }

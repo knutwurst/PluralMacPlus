@@ -65,7 +65,7 @@ final class DataLocationTests: XCTestCase {
     }
 
     func testUnmountedVolumeIsNilForMountedVolume() {
-        // The boot volume is always reachable through /Volumes.
+        // the boot volume always shows up in /Volumes
         let mounted = try! FileManager.default.contentsOfDirectory(atPath: "/Volumes").first!
         let path = URL(fileURLWithPath: "/Volumes/\(mounted)/does-not-exist-\(UUID().uuidString)")
         XCTAssertNil(DataLocation.unmountedVolume(for: path))

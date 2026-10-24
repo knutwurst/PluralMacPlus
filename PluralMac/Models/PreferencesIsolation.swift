@@ -8,53 +8,50 @@
 import Foundation
 import Security
 
-/// Separate UserDefaults per instance.
-///
-/// cfprefsd ignores HOME and CFFIXED_USER_HOME, so all instances of an app share one preferences
-/// file. For apps without Hardened Runtime, the bundled libPMPPreferences.dylib is injected via
-/// DYLD_INSERT_LIBRARIES and points `UserDefaults.standard` at a plist inside the instance folder.
+/// Separate UserDefaults per instance. cfprefsd ignores HOME and CFFIXED_USER_HOME, so every instance
+/// would share one plist. libPMPPreferences.dylib goes in via DYLD_INSERT_LIBRARIES (no Hardened
+/// Runtime only) and points `UserDefaults.standard` at a plist in the instance folder.
 nonisolated enum PreferencesIsolation {
 
-    /// Environment variable the shim reads the preferences file path from
+    /// the shim reads the plist path from here
     static let fileEnvironmentKey = "PMP_PREFERENCES_FILE"
 
     static let shimFileName = "libPMPPreferences.dylib"
 
-    /// Stable location of the shim, so launcher apps keep working when PluralMac Plus moves
+    /// fixed location, so launchers keep working when PluralMac Plus itself gets moved
     static var installedShimURL: URL {
         AppInstance.defaultBaseDirectory
             .appendingPathComponent("Support")
             .appendingPathComponent(shimFileName)
     }
 
-    /// The shim inside the PluralMac Plus app bundle
     static var bundledShimURL: URL? {
         Bundle.main.privateFrameworksURL?.appendingPathComponent(shimFileName)
     }
 
-    /// Preferences file of an instance. It must not be named like the bundle ID: for such a path
-    /// domain cfprefsd also mirrors AppKit apps' writes into the shared app domain.
+    /// Must not be named like the bundle ID. For such a path domain cfprefsd mirrors AppKit apps'
+    /// writes into the shared app domain as well.
     static func preferencesFile(dataPath: URL, bundleIdentifier: String) -> URL {
         dataPath
             .appendingPathComponent("Library/Preferences")
             .appendingPathComponent("\(bundleIdentifier).pluralmacplus.plist")
     }
 
-    /// File name used before 1.1.2 (named like the bundle ID, so writes leaked into the shared domain)
+    /// pre-1.1.2 name, the one that leaked writes into the shared domain
     static func legacyPreferencesFile(dataPath: URL, bundleIdentifier: String) -> URL {
         dataPath
             .appendingPathComponent("Library/Preferences")
             .appendingPathComponent("\(bundleIdentifier).plist")
     }
 
-    /// The app's shared preferences file in the real home folder
+    /// the app's normal plist in the real home folder
     static func sharedPreferencesFile(bundleIdentifier: String) -> URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Preferences")
             .appendingPathComponent("\(bundleIdentifier).plist")
     }
 
-    /// Copies the bundled shim to its stable location if it is missing or outdated
+    /// copies the bundled shim over if it is missing or outdated
     static func installShim() throws {
         guard let bundled = bundledShimURL,
               let bundledData = try? Data(contentsOf: bundled) else { return }
@@ -67,7 +64,6 @@ nonisolated enum PreferencesIsolation {
         try bundledData.write(to: target, options: .atomic)
     }
 
-    /// Whether the app at `url` runs with Hardened Runtime
     static func usesHardenedRuntime(appAt url: URL) -> Bool {
         guard let flags = signingInformation(appAt: url)?[kSecCodeInfoFlags as String] as? UInt32 else {
             return false
@@ -75,8 +71,8 @@ nonisolated enum PreferencesIsolation {
         return flags & SecCodeSignatureFlags.runtime.rawValue != 0
     }
 
-    /// Whether macOS lets the shim be injected: either no Hardened Runtime, or the app opts in to
-    /// DYLD environment variables and loading libraries signed by others
+    /// Hardened Runtime blocks DYLD_INSERT_LIBRARIES unless the app allows DYLD env vars and
+    /// libraries signed by someone else
     static func allowsLibraryInjection(appAt url: URL) -> Bool {
         guard usesHardenedRuntime(appAt: url) else { return true }
 
@@ -85,7 +81,6 @@ nonisolated enum PreferencesIsolation {
             && entitlements["com.apple.security.cs.disable-library-validation"] as? Bool == true
     }
 
-    /// Entitlements of the app's main executable
     static func entitlements(appAt url: URL) -> [String: Any] {
         signingInformation(appAt: url)?[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
     }
@@ -113,8 +108,8 @@ extension PreferencesIsolation {
         legacyPreferencesFile(dataPath: instance.dataPath, bundleIdentifier: instance.targetBundleIdentifier)
     }
 
-    /// Gives the instance its starting preferences unless it already has its own: the file from an
-    /// earlier version of PluralMac Plus if present, otherwise a copy of the shared preferences
+    /// Starting preferences unless the instance has its own already: the pre-1.1.2 file if there is
+    /// one, otherwise a copy of the shared plist
     static func seedPreferences(for instance: AppInstance, from shared: URL? = nil) throws {
         let file = preferencesFile(for: instance)
         let legacy = legacyPreferencesFile(for: instance)

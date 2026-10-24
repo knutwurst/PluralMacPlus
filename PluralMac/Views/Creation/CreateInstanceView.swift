@@ -9,65 +9,51 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// View for creating a new app instance.
-/// Guides the user through selecting an app, naming the instance,
-/// and configuring optional settings.
 struct CreateInstanceView: View {
-    
-    // MARK: - Properties
     
     @Bindable var viewModel: InstanceViewModel
     @Environment(\.dismiss) private var dismiss
     
-    // Form state
     @State private var selectedAppURL: URL?
     @State private var instanceName: String = ""
     @State private var isValidating = false
     @State private var validationError: String?
     @State private var detectedApp: Application?
     
-    // Advanced options
     @State private var showAdvancedOptions = false
     @State private var environmentVariables: [String: String] = [:]
     @State private var commandLineArguments: [String] = []
     @State private var customIconPath: URL?
     @State private var selectedIcon: NSImage?
     
-    // Data folder (nil = default from Settings)
+    // nil = default from Settings
     @State private var customDataPath: URL?
     @State private var folderWithExistingData: URL?
     @State private var showReuseDialog = false
     @State private var dataFolderOwner: String?
     @State private var showFolderInUseAlert = false
     
-    // Launcher app
     @State private var createLauncher = true
     @State private var launcherFolder = LauncherFolderPicker.applicationsFolder
     @State private var launcherIconHue: Double?
     @State private var separateHardwareID = false
     @State private var separatePreferences = true
     
-    // MARK: - Body
-    
     var body: some View {
         NavigationStack {
             Form {
-                // App Selection Section
                 appSelectionSection
                 
-                // Instance Name Section
                 if detectedApp != nil {
                     instanceNameSection
                     dataFolderSection
                     launcherSection
                 }
                 
-                // App Info Section
                 if let app = detectedApp {
                     appInfoSection(app: app)
                 }
                 
-                // Advanced Options
                 if detectedApp != nil {
                     advancedOptionsSection
                 }
@@ -85,7 +71,7 @@ struct CreateInstanceView: View {
                     customDataPath = folder
                 }
                 Button("Choose Another Folder...") {
-                    // Let the dialog close before opening the panel
+                    // let the dialog close before the panel opens
                     DispatchQueue.main.async { chooseDataFolder() }
                 }
                 Button("Cancel", role: .cancel) {}
@@ -119,13 +105,12 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - App Selection Section
+    // MARK: - Sections
     
     private var appSelectionSection: some View {
         Section {
             HStack {
                 if let url = selectedAppURL {
-                    // Show selected app
                     HStack(spacing: 12) {
                         appIcon(for: url)
                         
@@ -145,7 +130,6 @@ struct CreateInstanceView: View {
                         selectApp()
                     }
                 } else {
-                    // No app selected
                     Button {
                         selectApp()
                     } label: {
@@ -173,8 +157,6 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - Instance Name Section
-    
     private var instanceNameSection: some View {
         Section {
             TextField("Instance Name", text: $instanceName, prompt: Text("My Instance"))
@@ -185,8 +167,6 @@ struct CreateInstanceView: View {
             Text("Give your instance a unique name to identify it.")
         }
     }
-    
-    // MARK: - Data Folder Section
     
     private var dataFolderSection: some View {
         Section {
@@ -234,8 +214,6 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - Launcher Section
-    
     private var launcherSection: some View {
         Section {
             Toggle("Create launcher app", isOn: $createLauncher)
@@ -268,8 +246,6 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - App Info Section
-    
     private func appInfoSection(app: Application) -> some View {
         Section {
             LabeledContent("App Type") {
@@ -294,8 +270,6 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - Advanced Options Section
-    
     private var advancedOptionsSection: some View {
         Section(isExpanded: $showAdvancedOptions) {
             DisclosureGroup("Environment Variables & Arguments") {
@@ -303,7 +277,6 @@ struct CreateInstanceView: View {
                     .padding(.vertical, 4)
             }
             
-            // Custom Icon
             VStack(alignment: .leading, spacing: 8) {
                 Text("Instance Icon")
                     .font(.subheadline)
@@ -321,8 +294,6 @@ struct CreateInstanceView: View {
         }
     }
     
-    // MARK: - Helper Views
-    
     @ViewBuilder
     private func appIcon(for url: URL) -> some View {
         let icon = NSWorkspace.shared.icon(forFile: url.path)
@@ -332,10 +303,6 @@ struct CreateInstanceView: View {
             .frame(width: 40, height: 40)
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
-    
-
-    
-    // MARK: - Computed Properties
     
     private var canCreate: Bool {
         detectedApp != nil && !instanceName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -398,7 +365,6 @@ struct CreateInstanceView: View {
             
             detectedApp = app
             
-            // Auto-generate instance name
             if instanceName.isEmpty {
                 instanceName = "\(app.name) Instance"
             }
@@ -433,8 +399,6 @@ struct CreateInstanceView: View {
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     CreateInstanceView(viewModel: InstanceViewModel())

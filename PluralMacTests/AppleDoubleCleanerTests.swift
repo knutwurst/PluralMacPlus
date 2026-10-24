@@ -22,7 +22,7 @@ final class AppleDoubleCleanerTests: XCTestCase {
     }
 
     func testAPFSFolderNeedsNoCleanup() throws {
-        // The temporary folder lives on the system volume (APFS)
+        // the temp folder sits on the APFS system volume
         XCTAssertFalse(AppleDoubleCleaner.needsCleanup(at: try makeTemporaryDirectory(self)))
     }
 

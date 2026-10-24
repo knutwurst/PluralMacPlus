@@ -8,37 +8,28 @@
 
 import SwiftUI
 
-/// View shown when there are no instances created yet.
 struct EmptyStateView: View {
     
-    // MARK: - Properties
-    
     var onCreateTapped: () -> Void
-    
-    // MARK: - Body
     
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
             
-            // Icon
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 56))
                 .foregroundStyle(.tertiary)
             
-            // Title
             Text("No Instances Yet")
                 .font(.title2)
                 .fontWeight(.medium)
             
-            // Description
             Text("Create your first app instance to run multiple copies of the same app with isolated data.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)
             
-            // Create button
             Button(action: onCreateTapped) {
                 Label("Create Instance", systemImage: "plus")
             }
@@ -48,14 +39,11 @@ struct EmptyStateView: View {
             
             Spacer()
             
-            // Help text
             helpSection
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
-    
-    // MARK: - Help Section
     
     private var helpSection: some View {
         VStack(spacing: 12) {
@@ -99,8 +87,6 @@ struct EmptyStateView: View {
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     EmptyStateView(onCreateTapped: {})

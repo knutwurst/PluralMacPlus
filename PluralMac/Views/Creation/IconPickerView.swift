@@ -9,31 +9,22 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// View for selecting and customizing instance icons.
 struct IconPickerView: View {
     
-    // MARK: - Properties
-    
-    /// The currently selected/displayed icon
     @Binding var selectedIcon: NSImage?
     
-    /// Path to custom icon file (if using custom)
+    /// nil = original app icon.
     @Binding var customIconPath: URL?
     
-    /// The source app for extracting original icon
     let sourceAppURL: URL?
     
     @State private var isLoading = false
     @State private var showIconOptions = false
     
-    // MARK: - Body
-    
     var body: some View {
         VStack(spacing: 12) {
-            // Icon Preview
             iconPreview
             
-            // Action Buttons
             HStack(spacing: 8) {
                 Button("Change Icon") {
                     showIconOptions = true
@@ -57,8 +48,6 @@ struct IconPickerView: View {
         }
     }
     
-    // MARK: - Icon Preview
-    
     private var iconPreview: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
@@ -81,8 +70,6 @@ struct IconPickerView: View {
         }
     }
     
-    // MARK: - Icon Options Popover
-    
     private var iconOptionsPopover: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Choose Icon")
@@ -90,7 +77,6 @@ struct IconPickerView: View {
             
             Divider()
             
-            // Use original app icon
             Button {
                 resetToOriginal()
                 showIconOptions = false
@@ -99,7 +85,6 @@ struct IconPickerView: View {
             }
             .buttonStyle(.plain)
             
-            // Choose from file
             Button {
                 chooseIconFromFile()
                 showIconOptions = false
@@ -108,7 +93,6 @@ struct IconPickerView: View {
             }
             .buttonStyle(.plain)
             
-            // Choose from system icons
             Button {
                 chooseSystemIcon()
                 showIconOptions = false
@@ -116,11 +100,10 @@ struct IconPickerView: View {
                 Label("System Icons...", systemImage: "star.square.on.square")
             }
             .buttonStyle(.plain)
-            .disabled(true) // TODO: Implement system icon picker
+            .disabled(true) // TODO: system icon picker
             
             Divider()
             
-            // Extract from another app
             Button {
                 extractFromAnotherApp()
                 showIconOptions = false
@@ -132,8 +115,6 @@ struct IconPickerView: View {
         .padding()
         .frame(width: 220)
     }
-    
-    // MARK: - Actions
     
     private func loadInitialIcon() async {
         guard selectedIcon == nil, let appURL = sourceAppURL else { return }
@@ -147,7 +128,7 @@ struct IconPickerView: View {
                 selectedIcon = icon
             }
         } catch {
-            // Fallback to NSWorkspace
+            // NSWorkspace always comes up with something
             await MainActor.run {
                 selectedIcon = NSWorkspace.shared.icon(forFile: appURL.path)
             }
@@ -181,7 +162,7 @@ struct IconPickerView: View {
     }
     
     private func chooseSystemIcon() {
-        // TODO: Implement SF Symbol picker
+        // TODO: SF Symbol picker
     }
     
     private func extractFromAnotherApp() {
@@ -202,7 +183,6 @@ struct IconPickerView: View {
                 do {
                     let icon = try await IconExtractor.shared.extractIcon(from: appURL)
                     
-                    // Save to temp location
                     let tempURL = FileManager.default.temporaryDirectory
                         .appendingPathComponent(UUID().uuidString)
                         .appendingPathExtension("png")
@@ -214,14 +194,12 @@ struct IconPickerView: View {
                         selectedIcon = icon
                     }
                 } catch {
-                    // Handle error
+                    // keep whatever icon was there
                 }
             }
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     @Previewable @State var icon: NSImage? = nil

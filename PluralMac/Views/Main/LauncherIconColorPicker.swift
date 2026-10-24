@@ -11,13 +11,12 @@ import AppKit
 /// Hue slider with a live preview of the launcher icon.
 struct LauncherIconColorPicker: View {
 
-    /// Icon in its original colors
     let baseIcon: NSImage
 
-    /// Hue rotation in degrees (nil = original colors)
+    /// Degrees, nil = original colors.
     @Binding var hue: Double?
 
-    /// Small copy of the icon, so the preview stays fast while dragging
+    // tinting the full-size icon on every slider tick is sluggish, 64pt is plenty for a preview
     private var previewBase: NSImage {
         let preview = baseIcon.copy() as! NSImage
         preview.size = NSSize(width: 64, height: 64)

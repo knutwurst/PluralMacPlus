@@ -7,7 +7,7 @@ final class HardwareIdentityTests: XCTestCase {
         AppInstance(name: "Work Profile", application: makeTestApplication(), dataPath: URL(fileURLWithPath: "/tmp/work"))
     }
 
-    /// The exact command a common Flutter device-id plugin runs via NSAppleScript "do shell script"
+    /// verbatim what a popular Flutter device-id plugin runs via "do shell script"
     private let pluginCommand = "ioreg -l | grep IOPlatformUUID | awk 'NR==1{print $4}' | sed 's/\\\"//g'"
 
     private func runShell(_ command: String, environment: [String: String]) throws -> String {
@@ -68,7 +68,7 @@ final class HardwareIdentityTests: XCTestCase {
         instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
         let function = try XCTUnwrap(instance.effectiveEnvironmentVariables[HardwareIdentity.environmentKey])
 
-        // The launcher single-quotes "KEY=value"; the shell must hand it over byte for byte
+        // the launcher single-quotes KEY=value; the shell has to pass it through byte for byte
         let quoted = LauncherBuilder.shellQuote("\(HardwareIdentity.environmentKey)=\(function)")
         XCTAssertTrue(LauncherBuilder().script(for: instance).contains("--env \(quoted)"))
         XCTAssertEqual(try runShell("printf %s \(quoted)", environment: [:]), "\(HardwareIdentity.environmentKey)=\(function)")

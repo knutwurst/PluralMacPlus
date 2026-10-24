@@ -7,8 +7,7 @@
 
 import AppKit
 
-/// PayPal donation link, shown in Settings → About, the Help menu and the sidebar.
-/// The app only opens it when clicked and never asks on its own.
+/// PayPal link for Settings → About, the Help menu and the sidebar. Opens on click only, no nagging.
 enum Donation {
     static let url = URL(string: "https://paypal.me/oliverkoester")!
 

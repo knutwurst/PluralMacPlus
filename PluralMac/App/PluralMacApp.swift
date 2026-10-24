@@ -28,7 +28,6 @@ struct PluralMacApp: App {
         }
         .windowStyle(.automatic)
         .commands {
-            // Custom commands
             PluralMacCommands(showImportSheet: $showImportSheet)
         }
         
@@ -54,17 +53,13 @@ struct PluralMacApp: App {
     }
 }
 
-// MARK: - App Delegate
-
 class AppDelegate: NSObject, NSApplicationDelegate {
-    
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Load compatibility database on launch
         Task {
             await CompatibilityDatabase.shared.load()
         }
-        
-        // Setup menu bar if enabled in preferences
+
         let showMenuBar = UserDefaults.standard.bool(forKey: "showMenuBarIcon")
         if showMenuBar {
             Task { @MainActor in
@@ -74,26 +69,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        // Don't quit if menu bar icon is visible
+        // keep running in the menu bar when the last window closes
         return !MenuBarManager.shared.isMenuBarIconVisible
     }
 }
 
-// MARK: - Custom Commands
+// MARK: - Commands
 
 struct PluralMacCommands: Commands {
     @Binding var showImportSheet: Bool
-    
+
     var body: some Commands {
-        // Replace new item with our own
         CommandGroup(replacing: .newItem) {
             Button("New Instance...") {
                 NotificationCenter.default.post(name: .showCreateInstance, object: nil)
             }
             .keyboardShortcut("n", modifiers: .command)
         }
-        
-        // Import/Export
+
         CommandGroup(after: .importExport) {
             Button("Import Instances...") {
                 showImportSheet = true
@@ -111,8 +104,7 @@ struct PluralMacCommands: Commands {
                 Donation.open()
             }
         }
-        
-        // Instance actions
+
         CommandMenu("Instance") {
             Button("Launch Selected") {
                 NotificationCenter.default.post(name: .launchSelectedInstance, object: nil)
@@ -152,8 +144,6 @@ struct PluralMacCommands: Commands {
         }
     }
 }
-
-// MARK: - Notification Names
 
 extension Notification.Name {
     static let importInstances = Notification.Name("com.knutwurst.PluralMacPlus.importInstances")

@@ -20,7 +20,7 @@ final class ProfileFolderTests: XCTestCase {
 
         XCTAssertTrue(instance.effectiveCommandLineArguments.contains("--user-data-dir=/tmp/existing profile"))
         XCTAssertFalse(instance.effectiveCommandLineArguments.contains("--user-data-dir=/tmp/pmp-home"))
-        // HOME stays the user's own, so the app can reach the login keychain
+        // HOME stays the user's own, so the app still reaches the login keychain
         XCTAssertNil(instance.effectiveEnvironmentVariables["HOME"])
     }
 

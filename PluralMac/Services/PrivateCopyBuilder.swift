@@ -11,7 +11,6 @@ import UniformTypeIdentifiers
 
 /// A private copy of the target app that an instance runs instead of the original
 struct PrivateAppCopy: Codable, Hashable, Sendable {
-    /// The copied bundle
     var path: URL
 
     /// Version of the original the copy was made from ("short (build)")
@@ -70,14 +69,13 @@ nonisolated struct PrivateCopyBuilder {
         "com.apple.security.application-groups",
     ]
 
-    /// Default parent folder of all copies
     static var defaultClonesDirectory: URL {
         AppInstance.defaultBaseDirectory.appendingPathComponent("Clones")
     }
 
     let clonesDirectory: URL
 
-    /// Removes an old copy; the app moves it to the Trash
+    /// Old copies go to the Trash, never straight into the void
     var removeItem: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
 
     init(clonesDirectory: URL = PrivateCopyBuilder.defaultClonesDirectory) {
@@ -86,7 +84,6 @@ nonisolated struct PrivateCopyBuilder {
 
     // MARK: - Building
 
-    /// Creates (or recreates) the private copy of `original` for an instance
     func build(instanceID: UUID, name: String, original: URL, iconPNG: Data?, startScript: String, starter: Bool = false) throws -> PrivateAppCopy {
         let folder = clonesDirectory.appendingPathComponent(instanceID.uuidString)
         if FileManager.default.fileExists(atPath: folder.path) {
@@ -104,8 +101,8 @@ nonisolated struct PrivateCopyBuilder {
 
         try applyIdentity(to: copy, name: name, iconPNG: iconPNG, startScript: startScript)
 
-        // Nested code keeps its own entitlements; the real binary gets the filtered ones without
-        // Hardened Runtime; finally the bundle is sealed with the start script as main executable
+        // order matters: nested code keeps its entitlements, the real binary gets the filtered ones
+        // without Hardened Runtime, and the bundle is sealed last with the start script as main executable
         try codesign(["--force", "--deep", "--sign", "-", "--preserve-metadata=entitlements", copy.path])
         try signRealBinary(of: copy, original: original)
         try codesign(["--force", "--sign", "-", copy.path])
@@ -131,8 +128,8 @@ nonisolated struct PrivateCopyBuilder {
         }
 
         try applyIdentity(to: updated.path, name: name, iconPNG: iconPNG, startScript: startScript)
-        // The real binary of a copy from an earlier version was signed as main executable and is
-        // bound to the old Info.plist; sign it on its own before sealing the bundle again
+        // copies from older versions signed the real binary as main executable, bound to the old
+        // Info.plist. Sign it on its own before sealing the bundle again
         try signRealBinary(of: updated.path, original: original)
         try codesign(["--force", "--sign", "-", updated.path.path])
         try codesign(["--verify", "--deep", "--strict", updated.path.path])
@@ -142,8 +139,8 @@ nonisolated struct PrivateCopyBuilder {
 
     // MARK: - Steps
 
-    /// Writes (or rewrites) a Dock starter bundle: Info.plist with the instance's name and own
-    /// bundle ID, the start script as main executable and the icon. Nothing of the original is copied.
+    /// Dock starter: own Info.plist, name and bundle ID, start script as executable, icon.
+    /// Nothing of the original gets copied.
     private func writeStarter(at bundle: URL, instanceID: UUID, name: String, iconPNG: Data?, startScript: String) throws {
         let contents = bundle.appendingPathComponent("Contents")
         let macOS = contents.appendingPathComponent("MacOS")
@@ -283,8 +280,8 @@ nonisolated struct PrivateCopyBuilder {
         return "\(short) (\(build))"
     }
 
-    /// Launching registers the copy with LaunchServices, which then hands the app's bundle ID and
-    /// URL schemes to the copy instead of the original. Unregistering restores the original.
+    /// After a launch LaunchServices hands the app's bundle ID and URL schemes to the copy.
+    /// Unregistering gives them back to the original.
     static func unregisterFromLaunchServices(_ copy: URL) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: lsregisterPath)
@@ -295,9 +292,9 @@ nonisolated struct PrivateCopyBuilder {
         process.waitUntilExit()
     }
 
-    /// macOS caches name and icon per bundle and only rereads them when the bundle folder's
-    /// modification date changes; the clone keeps the original's date, so bump it, let
-    /// LaunchServices reread the bundle once and unregister it again
+    /// macOS caches name and icon like a squirrel caches nuts and only rereads them when the bundle
+    /// folder's mtime changes. The clone keeps the original's date, so bump it, let LaunchServices
+    /// reread once and unregister again.
     static func markChanged(_ copy: URL) {
         try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: copy.path)
         runLsregister(["-f", copy.path])
@@ -362,8 +359,8 @@ extension PrivateCopyBuilder {
                                   iconPNG: icon.flatMap(Self.pngData), startScript: Self.startScript(for: instance))
     }
 
-    /// Whether the instance's own app is a Dock starter rather than a re-signed clone. Apps isolated by
-    /// argument get a starter: a clone would only risk losing access to their keychain items.
+    /// Starter instead of a re-signed clone? Apps isolated by argument get a starter, a clone would
+    /// only risk losing access to their keychain items.
     static func usesStarter(_ instance: AppInstance) -> Bool {
         instance.privateCopy.map(\.isStarter) ?? !instance.canUsePrivateCopy
     }
@@ -400,7 +397,6 @@ extension PrivateCopyBuilder {
         return process.terminationStatus == 0
     }
 
-    /// Whether the copy's start script no longer matches the instance (settings changed)
     static func isStartScriptOutdated(_ instance: AppInstance) -> Bool {
         guard let copy = instance.privateCopy else { return false }
         let script = try? String(contentsOf: copy.path.appendingPathComponent("Contents/MacOS/\(startScriptName)"), encoding: .utf8)

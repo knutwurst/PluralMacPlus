@@ -8,15 +8,13 @@
 import AppKit
 import Darwin
 
-/// Reads the environment of another process of the same user.
+/// Environment and argv of another process of the same user, read via KERN_PROCARGS2
 nonisolated enum ProcessEnvironment {
 
-    /// Environment of `pid`, or nil if it can't be read
     static func environment(of pid: pid_t) -> [String: String]? {
         procArgs(of: pid).flatMap(parse(procArgs:))
     }
 
-    /// Command-line arguments of `pid` (without the executable), or nil if they can't be read
     static func arguments(of pid: pid_t) -> [String]? {
         procArgs(of: pid).flatMap(parseArguments(procArgs:))
     }
@@ -31,7 +29,6 @@ nonisolated enum ProcessEnvironment {
         return Array(buffer.prefix(size))
     }
 
-    /// Environment from a KERN_PROCARGS2 buffer
     static func parse(procArgs bytes: [UInt8]) -> [String: String]? {
         split(procArgs: bytes)?.environment
     }
@@ -41,7 +38,7 @@ nonisolated enum ProcessEnvironment {
         split(procArgs: bytes).map { Array($0.arguments.dropFirst()) }
     }
 
-    /// Splits a KERN_PROCARGS2 buffer: argc, executable path, padding, argv strings, environment strings
+    /// KERN_PROCARGS2 layout: argc, executable path, NUL padding, argv strings, environment strings
     private static func split(procArgs bytes: [UInt8]) -> (arguments: [String], environment: [String: String])? {
         let argcSize = MemoryLayout<Int32>.size
         guard bytes.count > argcSize else { return nil }
@@ -76,17 +73,15 @@ nonisolated enum ProcessEnvironment {
     }
 }
 
-/// A running app process as seen by instance discovery
 nonisolated struct RunningProcess: Equatable {
     let pid: pid_t
     let bundleURL: URL
-    /// HOME of the process (instances run with HOME = their data folder)
+    /// instances run with HOME = their data folder
     let home: String?
-    /// Command-line arguments (instances isolated by argument carry their profile folder)
+    /// instances isolated by argument carry their profile folder here
     var arguments: [String] = []
 }
 
-/// Maps running processes to the instances they belong to.
 enum RunningInstanceMatcher {
 
     /// Instance ID → PID for every process that runs an instance

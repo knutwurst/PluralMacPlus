@@ -8,14 +8,9 @@
 
 import SwiftUI
 
-/// List view showing all app instances in the sidebar.
 struct InstanceListView: View {
     
-    // MARK: - Properties
-    
     @Bindable var viewModel: InstanceViewModel
-    
-    // MARK: - Body
     
     var body: some View {
         List(selection: Binding(
@@ -29,7 +24,7 @@ struct InstanceListView: View {
                     .tag(instance.id)
             }
             .onDelete(perform: deleteInstances)
-            // Reordering only makes sense on the unfiltered list
+            // nil while searching, reordering a filtered list goes nowhere good
             .onMove(perform: moveHandler)
         }
         .listStyle(.sidebar)
@@ -57,14 +52,11 @@ struct InstanceListView: View {
         }
     }
     
-    // MARK: - Context Menu
-    
     @ViewBuilder
     private func contextMenuContent(for ids: Set<UUID>) -> some View {
         let selectedInstances = viewModel.instances.filter { ids.contains($0.id) }
         
         if selectedInstances.count == 1, let instance = selectedInstances.first {
-            // Single selection menu
             Button {
                 Task {
                     try? await viewModel.launchInstance(instance)
@@ -140,7 +132,6 @@ struct InstanceListView: View {
                 Label("Delete Shortcut & Data", systemImage: "trash.fill")
             }
         } else if selectedInstances.count > 1 {
-            // Multi-selection menu
             Button(role: .destructive) {
                 Task {
                     try? await viewModel.deleteInstances(selectedInstances, deleteData: false)
@@ -151,8 +142,6 @@ struct InstanceListView: View {
         }
     }
     
-    // MARK: - Actions
-    
     private func deleteInstances(at offsets: IndexSet) {
         let instancesToDelete = offsets.map { viewModel.filteredInstances[$0] }
         Task {
@@ -160,8 +149,6 @@ struct InstanceListView: View {
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     @Previewable @State var viewModel = InstanceViewModel()

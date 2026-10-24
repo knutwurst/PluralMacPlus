@@ -2,8 +2,7 @@ import XCTest
 import AppKit
 @testable import PluralMac
 
-/// Apps isolated by argument get a Dock starter instead of a re-signed clone: a small bundle with
-/// the instance's name and icon that execs the original binary
+/// Dock starter: tiny bundle with the instance's name and icon that execs the original binary
 final class DockStarterTests: XCTestCase {
 
     private var folder: URL!
@@ -55,8 +54,6 @@ final class DockStarterTests: XCTestCase {
         return process.terminationStatus == 0
     }
 
-    // MARK: - Tests
-
     func testArgumentIsolatedAppsGetAStarter() throws {
         let instance = try makeInstance(app: try makeElectronApp())
         XCTAssertTrue(PrivateCopyBuilder.usesStarter(instance))
@@ -83,16 +80,15 @@ final class DockStarterTests: XCTestCase {
         XCTAssertEqual(plist["LSUIElement"] as? Bool, false)
         XCTAssertEqual(plist["CFBundleIconFile"] as? String, PrivateCopyBuilder.iconFileName)
         XCTAssertTrue(FileManager.default.fileExists(atPath: starter.path.appendingPathComponent("Contents/Resources/\(PrivateCopyBuilder.iconFileName).icns").path))
-        // Nothing of the original is copied
         XCTAssertFalse(FileManager.default.fileExists(atPath: starter.path.appendingPathComponent("Contents/MacOS/Example").path))
 
         let script = try String(contentsOf: starter.path.appendingPathComponent("Contents/MacOS/\(PrivateCopyBuilder.startScriptName)"), encoding: .utf8)
         let binary = LauncherBuilder.shellQuote(original.appendingPathComponent("Contents/MacOS/Example").path)
         let profile = LauncherBuilder.shellQuote("--user-data-dir=\(instance.profilePath!.path)")
         XCTAssertTrue(script.hasSuffix("exec \(binary) '--flag' \(profile) \"$@\"\n"), script)
-        // The app keeps the user's HOME so it can store keys in the login keychain
+        // no HOME redirect, or the app loses the login keychain
         XCTAssertFalse(script.contains("HOME="), script)
-        // A starter has its own bundle ID, so it stays registered
+        // own bundle ID, nothing to re-register
         XCTAssertFalse(script.contains("lsregister"))
 
         XCTAssertTrue(try verifies(starter.path))
@@ -129,7 +125,7 @@ final class DockStarterTests: XCTestCase {
         XCTAssertFalse(PrivateCopyBuilder.needsRefresh(instance))
     }
 
-    /// The starter execs the original binary, so macOS lists the process under the original app
+    /// the starter execs the original binary, so the process shows up as the original app
     func testRunningStarterProcessMatchesInstance() throws {
         var instance = try makeInstance(app: try makeElectronApp())
         instance.privateCopy = try builder().build(for: instance, icon: nil)
@@ -145,7 +141,7 @@ final class DockStarterTests: XCTestCase {
         XCTAssertTrue(RunningInstanceMatcher.match(instances: [instance], processes: [normal]).isEmpty)
     }
 
-    /// Copy and starter pass the arguments themselves; the launcher app must not add them twice
+    /// copy and starter pass the arguments themselves, the launcher must not add them twice
     func testLauncherDoesNotRepeatArgumentsOfStarter() throws {
         var instance = try makeInstance(app: try makeElectronApp())
         instance.privateCopy = try builder().build(for: instance, icon: nil)
@@ -155,7 +151,7 @@ final class DockStarterTests: XCTestCase {
         XCTAssertFalse(script.contains("lsregister"), script)
     }
 
-    /// A redirected HOME hides the login keychain; apps with their own profile argument keep the real HOME
+    /// a redirected HOME hides the login keychain, so profile-argument apps keep the real one
     func testArgumentIsolatedAppsKeepTheirHome() throws {
         var instance = try makeInstance(app: try makeElectronApp())
         instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)

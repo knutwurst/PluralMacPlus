@@ -2,15 +2,14 @@ import XCTest
 import ObjectiveC
 @testable import PluralMac
 
-/// Loads the bundled shim into the test process and checks where UserDefaults.standard writes.
+/// Loads the bundled shim into the test process and checks where UserDefaults.standard writes
 final class PreferencesShimTests: XCTestCase {
 
     func testShimRedirectsStandardDefaultsToInstanceFile() throws {
         let shim = try XCTUnwrap(PreferencesIsolation.bundledShimURL, "shim not embedded in the app bundle")
         XCTAssertTrue(FileManager.default.fileExists(atPath: shim.path))
 
-        // cfprefsd doesn't persist path domains inside the per-user temp folder (/var/folders),
-        // so use a regular folder like a real instance data folder
+        // cfprefsd won't persist path domains under /var/folders, so use a normal folder like a real instance
         let folder = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Caches/PluralMacTests-\(UUID().uuidString)")
         addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
@@ -20,7 +19,7 @@ final class PreferencesShimTests: XCTestCase {
 
         let handle = try XCTUnwrap(dlopen(shim.path, RTLD_NOW), String(cString: dlerror()))
         defer {
-            // Undo the swizzle so other tests see the real standard defaults again
+            // undo the swizzle, later tests want the real standard defaults
             let original = class_getClassMethod(UserDefaults.self, #selector(getter: UserDefaults.standard))!
             let replacement = class_getClassMethod(UserDefaults.self, NSSelectorFromString("pmp_standardUserDefaults"))!
             method_exchangeImplementations(original, replacement)
@@ -30,11 +29,10 @@ final class PreferencesShimTests: XCTestCase {
         UserDefaults.standard.set("instance value", forKey: "pmpShimTest")
         UserDefaults.standard.synchronize()
 
-        // The value lives in the instance domain, not in the host app's own defaults
         XCTAssertEqual(UserDefaults(suiteName: file.path)?.string(forKey: "pmpShimTest"), "instance value")
         XCTAssertNil(UserDefaults(suiteName: Bundle.main.bundleIdentifier!)?.string(forKey: "pmpShimTest"))
 
-        // Another process sees the value through cfprefsd (which writes the plist itself later)
+        // ask through `defaults`: cfprefsd writes the plist when it gets around to it
         let domain = file.deletingPathExtension().path
         XCTAssertEqual(try readDefault(domain: domain, key: "pmpShimTest"), "instance value")
     }

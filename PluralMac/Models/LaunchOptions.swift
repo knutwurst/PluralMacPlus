@@ -11,7 +11,7 @@ import SwiftUI
 /// Validation for custom environment variables and command-line arguments.
 enum LaunchOptions {
 
-    /// Variables PluralMac Plus sets itself for isolation; custom values would be overwritten
+    /// set by PluralMac Plus for isolation, a custom value would just get overwritten
     static let reservedVariables: Set<String> = [
         "HOME", "CFFIXED_USER_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
     ]
@@ -28,14 +28,14 @@ enum LaunchOptions {
         return nil
     }
 
-    /// Trimmed argument, or nil if it is blank
+    /// trimmed, nil if blank
     static func normalizedArgument(_ argument: String) -> String? {
         let trimmed = argument.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 }
 
-/// Manual ordering of instances in the sidebar.
+/// drag & drop order in the sidebar
 enum InstanceOrdering {
 
     static func move(_ instances: [AppInstance], from source: IndexSet, to destination: Int) -> [AppInstance] {

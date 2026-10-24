@@ -1,7 +1,7 @@
 import XCTest
 @testable import PluralMac
 
-/// Creates a unique temporary directory that is removed after the test.
+/// Unique temp folder, removed again in teardown
 func makeTemporaryDirectory(_ testCase: XCTestCase) throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("PluralMacTests-\(UUID().uuidString)")
@@ -12,7 +12,7 @@ func makeTemporaryDirectory(_ testCase: XCTestCase) throws -> URL {
     return url
 }
 
-/// Builds a minimal fake .app bundle on disk and loads it as an Application.
+/// Minimal fake .app, shared by all tests at a fixed temp path
 func makeTestApplication() -> Application {
     let bundleURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("PluralMacTests-FakeApp/ExampleApp.app")

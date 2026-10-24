@@ -3,8 +3,6 @@ import XCTest
 
 final class RunningInstanceDiscoveryTests: XCTestCase {
 
-    // MARK: - Process arguments parsing
-
     /// Builds a KERN_PROCARGS2 buffer: argc, exec path, padding, argv, env
     private func procArgsBuffer(argv: [String], env: [String]) -> [UInt8] {
         var argc = Int32(argv.count)
@@ -51,8 +49,6 @@ final class RunningInstanceDiscoveryTests: XCTestCase {
         let environment = ProcessEnvironment.environment(of: getpid())
         XCTAssertEqual(environment?["HOME"], ProcessInfo.processInfo.environment["HOME"])
     }
-
-    // MARK: - Matching processes to instances
 
     private func makeInstance(dataPath: String) -> AppInstance {
         AppInstance(name: "Work Profile", application: makeTestApplication(), dataPath: URL(fileURLWithPath: dataPath))

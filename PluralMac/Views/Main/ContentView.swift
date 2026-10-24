@@ -9,11 +9,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Main content view of the application.
-/// Uses a NavigationSplitView with sidebar list and detail view.
 struct ContentView: View {
-    
-    // MARK: - Properties
     
     @State private var viewModel = InstanceViewModel()
     @State private var showingCreateSheet = false
@@ -26,14 +22,10 @@ struct ContentView: View {
     @State private var renameName = ""
     @State private var duplicateName = ""
     
-    // MARK: - Body
-    
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            // Sidebar: Instance List
             sidebarContent
         } detail: {
-            // Detail: Selected instance or empty state
             detailContent
         }
         .navigationSplitViewStyle(.balanced)
@@ -84,7 +76,7 @@ struct ContentView: View {
                 Text("Ready to import \(validCount) instance(s).")
             }
         }
-        // Handle keyboard shortcut notifications
+        // menu commands (PluralMacApp) arrive as notifications
         .onReceive(NotificationCenter.default.publisher(for: .showCreateInstance)) { _ in
             showingCreateSheet = true
         }
@@ -123,7 +115,6 @@ struct ContentView: View {
                 showingDeleteConfirmation = true
             }
         }
-        // Additional dialogs
         .alert("Rename Instance", isPresented: $showingRenameSheet) {
             TextField("Name", text: $renameName)
             Button("Cancel", role: .cancel) {}
@@ -159,7 +150,7 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Export All
+    // MARK: - Import / Export
     
     private func exportAllInstances() {
         let panel = NSSavePanel()
@@ -174,8 +165,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Import Handler
-    
     private func handleImport(from url: URL) async {
         do {
             importResults = try await viewModel.importInstances(from: url)
@@ -186,12 +175,11 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Sidebar Content
+    // MARK: - Sidebar
     
     @ViewBuilder
     private var sidebarContent: some View {
         VStack(spacing: 0) {
-            // Instance list
             if viewModel.hasInstances {
                 InstanceListView(viewModel: viewModel)
             } else {
@@ -206,8 +194,6 @@ struct ContentView: View {
         .navigationTitle("Instances")
         .searchable(text: $viewModel.searchText, prompt: "Search instances")
     }
-    
-    // MARK: - Sidebar Toolbar
     
     private var sidebarToolbar: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -241,7 +227,7 @@ struct ContentView: View {
         .background(.bar)
     }
     
-    // MARK: - Detail Content
+    // MARK: - Detail
     
     @ViewBuilder
     private var detailContent: some View {
@@ -251,8 +237,6 @@ struct ContentView: View {
             noSelectionView
         }
     }
-    
-    // MARK: - No Selection View
     
     private var noSelectionView: some View {
         VStack(spacing: 16) {
@@ -279,8 +263,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     ContentView()

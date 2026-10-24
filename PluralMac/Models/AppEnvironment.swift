@@ -9,8 +9,8 @@ import Foundation
 
 nonisolated enum AppEnvironment {
 
-    /// True when PluralMac Plus runs as the host app of the unit tests. It then must not load the
-    /// user's instances, because loading also refreshes launchers and private copies on disk.
+    /// PluralMac Plus is the unit test host. Then it must keep its hands off the user's instances:
+    /// loading them also refreshes launchers and private copies on disk.
     static var isRunningTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || NSClassFromString("XCTestCase") != nil

@@ -24,7 +24,7 @@ final class PreferencesIsolationTests: XCTestCase {
                        "/tmp/work/Library/Preferences/\(instance.targetBundleIdentifier).pluralmacplus.plist")
     }
 
-    /// cfprefsd mirrors writes into the real app domain when the file is named like the bundle ID
+    /// cfprefsd mirrors writes into the real app domain if the file is named like the bundle ID
     func testPreferencesFileIsNotNamedLikeTheAppDomain() {
         let file = PreferencesIsolation.preferencesFile(for: makeInstance())
         XCTAssertNotEqual(file.deletingPathExtension().lastPathComponent, makeInstance().targetBundleIdentifier)
@@ -118,9 +118,7 @@ final class PreferencesIsolationTests: XCTestCase {
         XCTAssertFalse(PreferencesIsolation.allowsLibraryInjection(appAt: app))
     }
 
-    // MARK: - Helpers
-
-    /// Copy of the fake app with a real Mach-O executable, so codesign can embed entitlements
+    /// needs a real Mach-O, otherwise codesign can't embed entitlements
     private func copyFakeApp(to destination: URL) throws -> URL {
         let source = makeTestApplication().path
         try FileManager.default.copyItem(at: source, to: destination)

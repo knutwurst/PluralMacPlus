@@ -9,38 +9,28 @@
 import Foundation
 import SwiftUI
 
-/// Represents the type of macOS application for determining
-/// the appropriate data isolation strategy.
+/// Decides which isolation strategy an app gets.
 enum AppType: String, Codable, CaseIterable, Sendable {
-    /// Chromium-based browsers (Chrome, Edge, Brave, Vivaldi, Arc, etc.)
-    /// Uses `--user-data-dir` for data isolation
+    /// Chrome, Edge, Brave, Vivaldi, Arc ... (`--user-data-dir`)
     case chromium
     
-    /// Firefox-based browsers (Firefox, Waterfox, LibreWolf, etc.)
-    /// Uses `-profile` argument for data isolation
+    /// Firefox, Waterfox, LibreWolf ... (`-profile`)
     case firefox
     
-    /// Electron-based apps (VS Code, Slack, Discord, Notion, etc.)
-    /// Uses HOME redirection or app-specific flags
     case electron
     
-    /// ToDesktop-based apps (Cursor IDE, Linear, etc.)
-    /// Similar to Electron, uses HOME redirection
+    /// Cursor, Linear and other ToDesktop wrappers. Behave like Electron.
     case toDesktop
     
-    /// Generic non-sandboxed apps
-    /// Uses HOME environment variable redirection
+    /// anything else that isn't sandboxed, isolated via HOME
     case generic
     
-    /// Mac App Store sandboxed apps - NOT SUPPORTED for data isolation
+    /// App Store sandbox, the container wins. Not supported.
     case sandboxed
     
-    /// Apple system apps (com.apple.*) - NOT SUPPORTED
+    /// com.apple.*, hands off
     case system
     
-    // MARK: - Computed Properties
-    
-    /// Whether this app type supports data isolation
     var supportsDataIsolation: Bool {
         switch self {
         case .chromium, .firefox, .electron, .toDesktop, .generic:
@@ -50,7 +40,6 @@ enum AppType: String, Codable, CaseIterable, Sendable {
         }
     }
     
-    /// Human-readable display name
     var displayName: String {
         switch self {
         case .chromium: return "Chromium-based Browser"
@@ -63,7 +52,6 @@ enum AppType: String, Codable, CaseIterable, Sendable {
         }
     }
     
-    /// Recommended data isolation method
     var isolationMethod: DataIsolationMethod {
         switch self {
         case .chromium:
@@ -80,7 +68,6 @@ enum AppType: String, Codable, CaseIterable, Sendable {
         }
     }
     
-    /// Compatibility indicator for UI
     var compatibilityLevel: CompatibilityLevel {
         switch self {
         case .chromium, .firefox:
@@ -95,35 +82,21 @@ enum AppType: String, Codable, CaseIterable, Sendable {
     }
 }
 
-// MARK: - Supporting Types
-
-/// Method used to isolate data between instances
 enum DataIsolationMethod: String, Codable, Sendable {
-    /// Use `--user-data-dir` argument (Chromium)
     case userDataDir
-    
-    /// Use `-profile` argument (Firefox)
     case profileArgument
-    
-    /// Override HOME environment variable
     case homeRedirection
-    
-    /// No isolation possible
     case none
 }
 
-/// UI indicator for app compatibility
 enum CompatibilityLevel: String, Codable, Sendable {
-    /// ✅ Fully supported and tested
     case full
     
-    /// Isolated through its own home folder (HOME/CFFIXED_USER_HOME); works for apps using the usual Library folders
+    /// own home folder (HOME/CFFIXED_USER_HOME). Fine for apps that stick to the usual Library folders.
     case partial
     
-    /// ❌ Not supported
     case unsupported
     
-    /// SF Symbol name for the indicator
     var symbolName: String {
         switch self {
         case .full: return "checkmark.circle.fill"
@@ -132,7 +105,6 @@ enum CompatibilityLevel: String, Codable, Sendable {
         }
     }
     
-    /// Color name for the indicator
     var colorName: String {
         switch self {
         case .full: return "green"
@@ -143,7 +115,6 @@ enum CompatibilityLevel: String, Codable, Sendable {
 }
 
 extension CompatibilityLevel {
-    /// Color of the indicator
     var color: Color {
         switch self {
         case .full: return .green

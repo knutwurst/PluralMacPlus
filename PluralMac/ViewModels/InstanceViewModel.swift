@@ -11,50 +11,33 @@ import AppKit
 import SwiftUI
 import OSLog
 
-/// ViewModel for managing the list of app instances.
-/// Handles loading, creating, updating, deleting, and launching instances.
 @MainActor
 @Observable
 final class InstanceViewModel {
     
-    // MARK: - Properties
-    
-    /// All app instances
     var instances: [AppInstance] = []
     
-    /// Currently selected instance (for detail view)
     var selectedInstance: AppInstance?
     
-    /// Search/filter text
     var searchText: String = ""
     
-    /// Loading state
     var isLoading: Bool = false
     
-    /// Error message to display
     var errorMessage: String?
     
-    /// Whether to show error alert
     var showError: Bool = false
     
-    /// Instances whose data folder is currently being moved
     var instancesMovingData: Set<UUID> = []
     
-    /// Instances whose private app copy is being built
     var instancesBuildingCopy: Set<UUID> = []
     
-    /// Tinted icons for the list and detail view, keyed by icon source and hue
+    // keyed by icon source + hue
     @ObservationIgnored private var displayIconCache: [String: NSImage] = [:]
-    
-    // MARK: - Private Properties
     
     private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "InstanceViewModel")
     private let store = InstanceStore.shared
     private let directLauncher = DirectLauncher.shared
     
-    // MARK: - Computed Properties
-    
-    /// Filtered instances based on search text
     var filteredInstances: [AppInstance] {
         guard !searchText.isEmpty else { return instances }
         
@@ -65,27 +48,23 @@ final class InstanceViewModel {
         }
     }
     
-    /// Whether there are any instances
     var hasInstances: Bool {
         !instances.isEmpty
     }
     
-    /// Number of instances
     var instanceCount: Int {
         instances.count
     }
     
-    // MARK: - Initialization
-    
     init() {
-        // A private copy can only be updated while its instance is not running
+        // private copies can only be rebuilt while their instance is down
         NotificationCenter.default.addObserver(forName: .instanceTerminated, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 await self?.refreshOutdatedPrivateCopies()
             }
         }
         
-        // Pick up instances started by launcher apps while PluralMac Plus is open
+        // pick up instances started by launcher apps while PluralMac Plus is open
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
@@ -97,11 +76,10 @@ final class InstanceViewModel {
         }
     }
     
-    // MARK: - Data Loading
+    // MARK: - Loading
     
-    /// Load instances from storage
     func loadInstances() async {
-        // Never touch the user's real instances from the unit test host
+        // the test host runs PMP itself, keep its hands off the real instances
         guard !AppEnvironment.isRunningTests else { return }
         
         isLoading = true
@@ -114,7 +92,7 @@ final class InstanceViewModel {
             handleError(error, context: "loading instances")
         }
         
-        // Launchers and instances load the preferences shim from a stable location
+        // launchers and instances load the preferences shim from a fixed location
         do {
             try PreferencesIsolation.installShim()
             for instance in instances where instance.separatePreferences == true {
@@ -124,15 +102,15 @@ final class InstanceViewModel {
             logger.error("Preparing separate preferences failed: \(error.localizedDescription)")
         }
         
-        // Instances may still be running from before PluralMac Plus was (re)opened
+        // instances may still be running from before PluralMac Plus was (re)opened
         await discoverRunningInstances()
         
         await refreshOutdatedLaunchers()
         await refreshOutdatedPrivateCopies()
     }
     
-    /// Give private copies made by an earlier version (or with stale settings or a broken signature)
-    /// a current start script; running instances are skipped and handled when they quit
+    /// Fresh start script for copies from older versions, with stale settings or a broken signature.
+    /// Running ones are skipped and get it when they quit.
     func refreshOutdatedPrivateCopies() async {
         guard !AppEnvironment.isRunningTests else { return }
         for instance in instances where PrivateCopyBuilder.needsRefresh(instance)
@@ -149,7 +127,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Rebuild launcher apps whose script no longer matches the instance (e.g. after an app update)
+    /// Rebuilds launchers whose script went stale, e.g. after an app update.
     private func refreshOutdatedLaunchers() async {
         let builder = LauncherBuilder()
         for instance in instances {
@@ -163,7 +141,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Find running processes that belong to instances and track them
+    /// Adopts already running processes that belong to an instance.
     func discoverRunningInstances() async {
         let processes = RunningInstanceMatcher.runningProcesses(for: instances)
         let matches = RunningInstanceMatcher.match(instances: instances, processes: processes)
@@ -173,25 +151,14 @@ final class InstanceViewModel {
         }
     }
     
-    /// Refresh instances from storage
     func refreshInstances() async {
         await store.clearCache()
         await loadInstances()
     }
     
-    // MARK: - Instance Creation
+    // MARK: - Create
     
-    /// Create a new instance from an application
-    /// - Parameters:
-    ///   - name: Display name for the instance
-    ///   - application: Target application
-    ///   - environmentVariables: Custom environment variables
-    ///   - arguments: Custom command-line arguments
-    ///   - customIconPath: Optional custom icon
-    ///   - dataPath: Optional data folder (nil = Data Directory setting)
-    ///   - launcherFolder: Folder for a launcher app (nil = no launcher)
-    ///   - launcherIconHue: Hue rotation for the launcher icon (nil = original colors)
-    /// - Returns: The created instance
+    /// dataPath nil = Data Directory setting, launcherFolder nil = no launcher.
     @discardableResult
     func createInstance(
         name: String,
@@ -211,7 +178,6 @@ final class InstanceViewModel {
             throw InstanceActionError.dataPathInUse(owner.name)
         }
         
-        // Create the instance model
         var instance = AppInstance(name: name, application: application, dataPath: dataPath)
         instance.environmentVariables = environmentVariables
         instance.commandLineArguments = arguments
@@ -224,11 +190,8 @@ final class InstanceViewModel {
             instance.separatePreferences = true
         }
         
-        // No bundle creation needed - we launch directly!
-        // Just save to storage
         try await store.addInstance(instance)
         
-        // Update local list
         instances.append(instance)
         
         if let launcherFolder {
@@ -239,13 +202,12 @@ final class InstanceViewModel {
         return instances.first { $0.id == instance.id } ?? instance
     }
     
-    // MARK: - Instance Updates
+    // MARK: - Update
     
-    /// Update an existing instance
     func updateInstance(_ instance: AppInstance) async throws {
         logger.info("Updating instance: \(instance.name)")
         
-        // Keep an existing launcher app and private copy in sync (name, data folder, arguments)
+        // launcher app and private copy follow name, data folder and arguments
         var instance = instance
         if PrivateCopyBuilder.needsRefresh(instance) {
             try await refreshPrivateCopyIdentityIfIdle(&instance)
@@ -258,22 +220,20 @@ final class InstanceViewModel {
         logger.info("Successfully updated instance: \(instance.name)")
     }
     
-    /// Save an instance and update the local list and selection
+    /// Store, local list and selection only. Leaves launcher and copy alone.
     private func persist(_ instance: AppInstance) async throws {
         try await store.updateInstance(instance)
         
-        // Update local list
         if let index = instances.firstIndex(where: { $0.id == instance.id }) {
             instances[index] = instance
         }
         
-        // Update selection if needed
         if selectedInstance?.id == instance.id {
             selectedInstance = instance
         }
     }
     
-    /// Rename an instance. Blank names are ignored; errors are shown in the error alert.
+    /// Blank names are ignored, errors go to the alert.
     func renameInstance(_ instance: AppInstance, to newName: String) async {
         guard let name = AppInstance.validatedName(newName), name != instance.name else { return }
         
@@ -289,14 +249,14 @@ final class InstanceViewModel {
     
     // MARK: - Launcher App
     
-    /// Create a launcher app for the instance in `folder`. Errors are shown in the error alert.
+    /// Reports errors via the alert instead of throwing.
     func createLauncher(for instance: AppInstance, in folder: URL) async {
         do {
             var updated = instances.first { $0.id == instance.id } ?? instance
             let previous = updated.launcherPath
             let launcher = try await installLauncher(for: updated, in: folder)
             
-            // Creating it elsewhere replaces the old one
+            // a launcher in a new place replaces the old one
             if let previous, previous.standardizedFileURL != launcher.standardizedFileURL,
                LauncherBuilder.isLauncher(at: previous, for: instance.id) {
                 try? FileManager.default.trashItem(at: previous, resultingItemURL: nil)
@@ -310,7 +270,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Move the launcher app to the Trash and forget it. Errors are shown in the error alert.
+    /// Trashes the launcher and forgets it.
     func removeLauncher(for instance: AppInstance) async {
         guard let launcher = instance.launcherPath else { return }
         
@@ -325,21 +285,20 @@ final class InstanceViewModel {
         }
     }
     
-    /// Reveal the launcher app in Finder
     func revealLauncherInFinder(_ instance: AppInstance) {
         if let launcher = instance.launcherPath {
             LaunchServicesHelper.revealInFinder(launcher)
         }
     }
     
-    /// Whether the instance has a launcher app on disk
+    /// Checks the disk, not just launcherPath.
     func hasLauncher(_ instance: AppInstance) -> Bool {
         guard let launcher = instance.launcherPath else { return false }
         return LauncherBuilder.isLauncher(at: launcher, for: instance.id)
     }
     
     private func installLauncher(for instance: AppInstance, in folder: URL) async throws -> URL {
-        // The launcher starts the app without PluralMac Plus, so prepare the data folder now
+        // the launcher starts the app without PluralMac Plus, so the data folder has to exist now
         if instance.redirectsHome {
             try await directLauncher.prepareDataDirectory(dataPath: instance.dataPath)
         }
@@ -351,7 +310,7 @@ final class InstanceViewModel {
         return launcher
     }
     
-    /// Rebuild an existing launcher; returns its (possibly renamed) location, or nil if it no longer exists
+    /// Returns the new location (the name may have changed), nil if the launcher is gone.
     private func refreshedLauncher(for instance: AppInstance) async -> URL? {
         guard let old = instance.launcherPath, LauncherBuilder.isLauncher(at: old, for: instance.id) else {
             return nil
@@ -369,7 +328,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Icon for the launcher app, including the hue chosen for the instance
+    /// Includes the instance hue.
     func launcherIcon(for instance: AppInstance) -> NSImage {
         let base: NSImage
         if let custom = instance.customIconPath, let image = NSImage(contentsOf: custom) {
@@ -383,7 +342,7 @@ final class InstanceViewModel {
         return LauncherBuilder.tinted(base, hueDegrees: hue)
     }
     
-    /// Icon the app shows for an instance: custom icon or the app's own, in the instance color
+    /// Custom or app icon, tinted and cached.
     func displayIcon(for instance: AppInstance) -> NSImage {
         let key = "\(instance.customIconPath?.path ?? instance.targetAppPath.path)|\(instance.launcherIconHue.map { String($0) } ?? "-")"
         if let cached = displayIconCache[key] {
@@ -396,7 +355,7 @@ final class InstanceViewModel {
         } else {
             base = NSWorkspace.shared.icon(forFile: instance.targetAppPath.path)
         }
-        // Small copy: list and header show it at up to 64 pt
+        // list and header show it at 64pt max
         let small = base.copy() as! NSImage
         small.size = NSSize(width: 128, height: 128)
         
@@ -405,7 +364,7 @@ final class InstanceViewModel {
         return icon
     }
     
-    /// Change the launcher icon color; an existing launcher is rebuilt. Errors are shown in the error alert.
+    /// Rebuilds an existing launcher with the new color.
     func setLauncherIconHue(_ instance: AppInstance, hue: Double?) async {
         var updated = instance
         updated.launcherIconHue = hue
@@ -418,9 +377,9 @@ final class InstanceViewModel {
         }
     }
     
-    // MARK: - Private App Copy
+    // MARK: - Private Copy
     
-    /// Build (or rebuild) a private copy of the app for the instance. Errors are shown in the error alert.
+    /// Also rebuilds an existing copy.
     func createPrivateCopy(for instance: AppInstance) async {
         guard !(await directLauncher.isRunning(instance.id)) else {
             handleError(PrivateCopyError.instanceRunning, context: "creating private copy")
@@ -436,7 +395,7 @@ final class InstanceViewModel {
         let starter = PrivateCopyBuilder.usesStarter(instance)
         
         do {
-            // Copying and signing a large app takes a while; keep the UI responsive
+            // copying and signing a big app takes a while, keep it off the main actor
             let copy = try await Task.detached {
                 try PrivateCopyBuilder().build(instanceID: id, name: name, original: original, iconPNG: icon,
                                                startScript: startScript, starter: starter)
@@ -454,7 +413,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Go back to running the original app; the copy moves to the Trash
+    /// Back to the original app, the copy goes to the Trash.
     func removePrivateCopy(from instance: AppInstance) async {
         guard !(await directLauncher.isRunning(instance.id)) else {
             handleError(PrivateCopyError.instanceRunning, context: "removing private copy")
@@ -468,7 +427,7 @@ final class InstanceViewModel {
         await save(updated, context: "removing private copy")
     }
     
-    /// Whether the original app was updated after the copy was made
+    /// The original got updated since the copy was made.
     func isPrivateCopyOutdated(_ instance: AppInstance) -> Bool {
         PrivateCopyBuilder.isOutdated(instance)
     }
@@ -480,8 +439,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// Apply name, icon and start script to the copy unless the instance is running (then it
-    /// happens before the next launch)
+    /// Pushes name, icon and start script into the copy. Skipped while it runs, launchInstance catches up.
     private func refreshPrivateCopyIdentityIfIdle(_ instance: inout AppInstance) async throws {
         guard let current = instance.privateCopy, !(await directLauncher.isRunning(instance.id)) else { return }
         
@@ -497,20 +455,20 @@ final class InstanceViewModel {
     
     // MARK: - Data Folder
     
-    /// Move the instance's data folder into `parent`. Errors are shown in the error alert.
+    /// Moves it into `parent` as a folder named after the instance.
     func moveDataFolder(_ instance: AppInstance, toParent parent: URL) async {
         logger.info("Moving data folder of \(instance.name) to \(parent.path)")
         
         instancesMovingData.insert(instance.id)
         defer { instancesMovingData.remove(instance.id) }
         
-        // Apps isolated by argument keep their data in the profile folder, so that is what moves
+        // argument-isolated apps keep their data in the profile folder, so that's what moves
         let source = instance.isolationRoot
         let folderName = instance.name
         let isRunning = await directLauncher.isRunning(instance.id)
         
         do {
-            // Run off the main actor: moving across volumes copies the whole folder
+            // across volumes this is a full copy, so not on the main actor
             let destination = try await Task.detached {
                 try DataFolderMover().move(from: source, toParent: parent, folderName: folderName, instanceIsRunning: isRunning)
             }.value
@@ -526,7 +484,7 @@ final class InstanceViewModel {
         }
     }
     
-    /// The folder "Delete Shortcut & Data" removes; never a profile folder the user chose
+    /// What "Delete Shortcut & Data" trashes. Never a profile folder the user picked.
     nonisolated static func dataFolderToDelete(for instance: AppInstance) -> URL? {
         if let profile = instance.profilePath,
            profile.standardizedFileURL.path == instance.dataPath.standardizedFileURL.path {
@@ -535,7 +493,7 @@ final class InstanceViewModel {
         return instance.dataPath
     }
     
-    /// Points data and profile folder that were at `source` to `destination`
+    /// Repoints dataPath/profilePath that were at `source`.
     nonisolated static func repoint(_ instance: inout AppInstance, from source: URL, to destination: URL) {
         let moved = source.standardizedFileURL.path
         if instance.dataPath.standardizedFileURL.path == moved {
@@ -545,8 +503,6 @@ final class InstanceViewModel {
             instance.profilePath = destination
         }
     }
-    
-    // MARK: - Profile Folder
     
     /// Point the app at an existing profile folder (nil = data folder). Applies at the next start.
     func setProfileFolder(_ instance: AppInstance, to folder: URL?) async {
@@ -558,7 +514,7 @@ final class InstanceViewModel {
     
     // MARK: - Hardware ID
     
-    /// Report a separate hardware UUID to the app (or the real one again). Applies at the next start.
+    /// Own hardware UUID on/off. Applies at the next start.
     func setSeparateHardwareID(_ instance: AppInstance, enabled: Bool) async {
         var updated = instance
         updated.hardwareIDOverride = enabled ? HardwareIdentity.separateID(for: instance.id) : nil
@@ -566,7 +522,7 @@ final class InstanceViewModel {
         await save(updated, context: "changing device ID")
     }
     
-    /// Give the instance a new random hardware UUID. Applies at the next start.
+    /// New random UUID, applies at the next start.
     func regenerateHardwareID(_ instance: AppInstance) async {
         var updated = instance
         updated.hardwareIDOverride = UUID()
@@ -584,8 +540,8 @@ final class InstanceViewModel {
     
     // MARK: - Preferences
     
-    /// Keep the app's preferences in the instance folder. On first use the instance gets a copy of
-    /// the shared preferences, so nothing is lost. Applies at the next start.
+    /// Preferences live in the instance folder. First time on, it gets a copy of the shared ones
+    /// so nothing is lost. Applies at the next start.
     func setSeparatePreferences(_ instance: AppInstance, enabled: Bool) async {
         var updated = instance
         updated.separatePreferences = enabled ? true : nil
@@ -602,9 +558,6 @@ final class InstanceViewModel {
         }
     }
     
-    // MARK: - Ordering
-    
-    /// Reorder instances in the sidebar and save the new order
     func moveInstances(from source: IndexSet, to destination: Int) async {
         instances = InstanceOrdering.move(instances, from: source, to: destination)
         do {
@@ -614,21 +567,16 @@ final class InstanceViewModel {
         }
     }
     
-    // MARK: - Instance Deletion
+    // MARK: - Delete
     
-    /// Delete an instance
-    /// - Parameters:
-    ///   - instance: The instance to delete
-    ///   - deleteData: Whether to also delete isolated data
     func deleteInstance(_ instance: AppInstance, deleteData: Bool = false) async throws {
         logger.info("Deleting instance: \(instance.name), deleteData: \(deleteData)")
         
-        // Terminate if running
         if await directLauncher.isRunning(instance.id) {
             _ = await directLauncher.terminate(instance.id)
         }
         
-        // Move the data folder to the Trash if requested, so a wrong click can be undone
+        // Trash, not rm, so a wrong click can be undone
         if deleteData, let folder = Self.dataFolderToDelete(for: instance) {
             let fileManager = FileManager.default
             if fileManager.fileExists(atPath: folder.path) {
@@ -637,21 +585,17 @@ final class InstanceViewModel {
             }
         }
         
-        // Private app copy goes to the Trash as well
         trashPrivateCopy(of: instance)
         
-        // Move our launcher app to the Trash (recoverable)
+        // only if it's really a PMP launcher, never whatever else sits at that path
         if let launcher = instance.launcherPath, LauncherBuilder.isLauncher(at: launcher, for: instance.id) {
             try? FileManager.default.trashItem(at: launcher, resultingItemURL: nil)
         }
         
-        // Remove from storage
         try await store.deleteInstance(id: instance.id)
         
-        // Update local list
         instances.removeAll { $0.id == instance.id }
         
-        // Clear selection if deleted
         if selectedInstance?.id == instance.id {
             selectedInstance = nil
         }
@@ -659,16 +603,15 @@ final class InstanceViewModel {
         logger.info("Successfully deleted instance: \(instance.name)")
     }
     
-    /// Delete multiple instances
     func deleteInstances(_ instances: [AppInstance], deleteData: Bool = false) async throws {
         for instance in instances {
             try await deleteInstance(instance, deleteData: deleteData)
         }
     }
     
-    // MARK: - Instance Launching
+    // MARK: - Launch
     
-    /// Launch an instance, or bring it to the front if it is already running
+    /// Brings it to the front instead if it already runs.
     func launchInstance(_ instance: AppInstance) async throws {
         if await directLauncher.isRunning(instance.id) {
             await bringToFront(instance)
@@ -677,17 +620,15 @@ final class InstanceViewModel {
         
         logger.info("Launching instance directly: \(instance.name)")
         
-        // A rename or icon change while the instance ran is applied to the copy now
+        // a rename or icon change while it ran gets applied to the copy now
         var instance = instance
         if PrivateCopyBuilder.needsRefresh(instance) {
             try await refreshPrivateCopyIdentityIfIdle(&instance)
             try await updateInstance(instance)
         }
         
-        // Launch the app directly with modified environment
         let process = try await directLauncher.launch(instance)
         
-        // Update last launched timestamp
         var updated = instance
         updated.recordLaunch()
         try await store.updateInstance(updated)
@@ -699,7 +640,7 @@ final class InstanceViewModel {
         logger.info("Successfully launched instance: \(instance.name) (PID: \(process.processIdentifier))")
     }
     
-    /// Bring a running instance to the front and restore a minimized window
+    /// Also restores a minimized window.
     func bringToFront(_ instance: AppInstance) async {
         guard let pid = await directLauncher.runningPID(instance.id),
               let app = NSRunningApplication(processIdentifier: pid) else {
@@ -709,9 +650,8 @@ final class InstanceViewModel {
         InstanceActivator.bringToFront(app)
     }
     
-    /// Check if an instance is currently running
     func isInstanceRunning(_ instance: AppInstance) -> Bool {
-        // Check synchronously - we need to make this async-safe
+        // careful: blocks the main actor while the Task wants it back. Use checkIsRunning.
         var isRunning = false
         let semaphore = DispatchSemaphore(value: 0)
         Task {
@@ -722,45 +662,38 @@ final class InstanceViewModel {
         return isRunning
     }
     
-    /// Terminate a running instance
     func terminateInstance(_ instance: AppInstance) async -> Bool {
         logger.info("Terminating instance: \(instance.name)")
         return await directLauncher.terminate(instance.id)
     }
     
-    /// Force terminate a running instance
     func forceTerminateInstance(_ instance: AppInstance) async -> Bool {
         logger.info("Force terminating instance: \(instance.name)")
         return await directLauncher.forceTerminate(instance.id)
     }
     
-    /// Check running status asynchronously
     func checkIsRunning(_ instance: AppInstance) async -> Bool {
         await directLauncher.isRunning(instance.id)
     }
     
-    // MARK: - Finder Integration
+    // MARK: - Finder
     
-    /// Reveal target app in Finder
+    /// The target app, not the instance data.
     func revealInFinder(_ instance: AppInstance) {
         LaunchServicesHelper.revealInFinder(instance.targetAppPath)
     }
     
-    /// Reveal instance data directory in Finder
     func revealDataInFinder(_ instance: AppInstance) {
         LaunchServicesHelper.revealInFinder(instance.isolationRoot)
     }
     
     // MARK: - Duplicate
     
-    /// Duplicate an instance with a new name
     func duplicateInstance(_ instance: AppInstance, newName: String) async throws -> AppInstance {
         logger.info("Duplicating instance: \(instance.name) as \(newName)")
         
-        // Load the original application
         let application = try Application(from: instance.targetAppPath)
         
-        // Create new instance with same settings
         var newInstance = AppInstance(name: newName, application: application)
         newInstance.environmentVariables = instance.environmentVariables
         newInstance.commandLineArguments = instance.commandLineArguments
@@ -769,32 +702,25 @@ final class InstanceViewModel {
         newInstance.eraseDataOnQuit = instance.eraseDataOnQuit
         newInstance.showMenuBarIcon = instance.showMenuBarIcon
         
-        // No bundle needed - just save to storage
         try await store.addInstance(newInstance)
         
-        // Update local list
         instances.append(newInstance)
         
         return newInstance
     }
     
-    // MARK: - Import/Export
+    // MARK: - Import / Export
     
-    /// Export selected instances to a file
     func exportInstances(_ instancesToExport: [AppInstance], to url: URL) async throws {
         logger.info("Exporting \(instancesToExport.count) instances")
         try await ImportExportManager.shared.exportToFile(instancesToExport, destination: url)
         logger.info("Successfully exported instances to \(url.path)")
     }
     
-    /// Export all instances to a file
     func exportAllInstances(to url: URL) async throws {
         try await exportInstances(instances, to: url)
     }
     
-    /// Import instances from a file
-    /// - Parameter url: The file to import from
-    /// - Returns: Array of validation results
     func importInstances(from url: URL) async throws -> [ImportValidationResult] {
         logger.info("Importing instances from \(url.path)")
         
@@ -804,16 +730,13 @@ final class InstanceViewModel {
         return validationResults
     }
     
-    /// Create instances from validated import configs
     func createFromImport(_ configs: [ImportedInstanceConfig]) async throws {
         for config in configs {
             do {
                 let instance = try config.createInstance()
                 
-                // No bundle needed - just save to storage
                 try await store.addInstance(instance)
                 
-                // Update local list
                 instances.append(instance)
                 
                 logger.info("Imported instance: \(instance.name)")
@@ -824,36 +747,30 @@ final class InstanceViewModel {
         }
     }
     
-    // MARK: - Error Handling
-    
     private func handleError(_ error: Error, context: String) {
         logger.error("Error \(context): \(error.localizedDescription)")
         errorMessage = error.localizedDescription
         showError = true
     }
     
-    /// Clear the current error
     func clearError() {
         errorMessage = nil
         showError = false
     }
 }
 
-// MARK: - Selection Helpers
+// MARK: - Selection
 
 extension InstanceViewModel {
     
-    /// Select an instance
     func select(_ instance: AppInstance?) {
         selectedInstance = instance
     }
     
-    /// Check if an instance is selected
     func isSelected(_ instance: AppInstance) -> Bool {
         selectedInstance?.id == instance.id
     }
     
-    /// Select the first instance if none selected
     func selectFirstIfNeeded() {
         if selectedInstance == nil, let first = filteredInstances.first {
             selectedInstance = first

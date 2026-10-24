@@ -8,11 +8,8 @@
 
 import Foundation
 
-/// Represents a pre-configured template for creating instances of specific app types.
-/// Templates provide recommended settings based on the type of application.
+/// Preset settings for a few well-known apps.
 struct InstanceTemplate: Identifiable, Codable {
-    
-    // MARK: - Properties
     
     let id: UUID
     let name: String
@@ -23,8 +20,6 @@ struct InstanceTemplate: Identifiable, Codable {
     let commandLineArguments: [String]
     let isolationMethod: DataIsolationMethod
     let iconSymbol: String
-    
-    // MARK: - Initialization
     
     init(
         id: UUID = UUID(),
@@ -49,33 +44,26 @@ struct InstanceTemplate: Identifiable, Codable {
     }
 }
 
-// MARK: - Built-in Templates
+// MARK: - Built-in
 
 extension InstanceTemplate {
     
-    /// All built-in templates
     static let builtIn: [InstanceTemplate] = [
-        // Browser Templates
         .chromeWork,
         .chromePersonal,
         .chromeDev,
         .firefoxPrivate,
         .firefoxDev,
         
-        // Communication Templates
         .slackWork,
         .slackPersonal,
         .discordAlt,
         
-        // Development Templates
         .vscodeProject,
         .cursorProject,
         
-        // Streaming Templates
         .spotifyAlt
     ]
-    
-    // MARK: - Browser Templates
     
     static let chromeWork = InstanceTemplate(
         name: "Chrome - Work",
@@ -136,8 +124,6 @@ extension InstanceTemplate {
         iconSymbol: "hammer.fill"
     )
     
-    // MARK: - Communication Templates
-    
     static let slackWork = InstanceTemplate(
         name: "Slack - Work",
         description: "Slack for primary work workspace",
@@ -160,6 +146,7 @@ extension InstanceTemplate {
         iconSymbol: "person.fill"
     )
     
+    // Discord ignores HOME and --user-data-dir, so "alt account" is more of a wish (see AppInstance)
     static let discordAlt = InstanceTemplate(
         name: "Discord - Alt Account",
         description: "Discord for alternative account",
@@ -170,8 +157,6 @@ extension InstanceTemplate {
         isolationMethod: .homeRedirection,
         iconSymbol: "person.2.fill"
     )
-    
-    // MARK: - Development Templates
     
     static let vscodeProject = InstanceTemplate(
         name: "VS Code - Project",
@@ -195,8 +180,6 @@ extension InstanceTemplate {
         iconSymbol: "folder.fill"
     )
     
-    // MARK: - Streaming Templates
-    
     static let spotifyAlt = InstanceTemplate(
         name: "Spotify - Alt Account",
         description: "Spotify for secondary account",
@@ -209,21 +192,17 @@ extension InstanceTemplate {
     )
 }
 
-// MARK: - Template Matching
+// MARK: - Matching
 
 extension InstanceTemplate {
     
-    /// Find templates that match a given application
-    /// - Parameter application: The application to match
-    /// - Returns: Array of matching templates
+    /// templates for the app's type, narrowed down by bundle ID when one fits
     static func templates(for application: Application) -> [InstanceTemplate] {
         let appType = application.appType
         let bundleId = application.bundleIdentifier.lowercased()
         
-        // First, filter by app type
         var matching = builtIn.filter { $0.appType == appType }
         
-        // Then, prioritize by bundle ID matches
         if bundleId.contains("chrome") {
             matching = matching.filter { $0.name.lowercased().contains("chrome") }
         } else if bundleId.contains("firefox") || bundleId.contains("waterfox") {
@@ -240,7 +219,7 @@ extension InstanceTemplate {
             matching = matching.filter { $0.name.lowercased().contains("spotify") }
         }
         
-        // If no specific matches, return generic templates for the app type
+        // nothing specific, so everything of that type
         if matching.isEmpty {
             matching = builtIn.filter { $0.appType == appType }
         }
@@ -248,7 +227,6 @@ extension InstanceTemplate {
         return matching
     }
     
-    /// Create a generic template for any app
     static func generic(for application: Application) -> InstanceTemplate {
         InstanceTemplate(
             name: "Custom Instance",

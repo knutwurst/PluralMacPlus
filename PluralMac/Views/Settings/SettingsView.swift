@@ -8,10 +8,7 @@
 
 import SwiftUI
 
-/// Settings view accessible via Preferences menu (Cmd+,)
 struct SettingsView: View {
-    
-    // MARK: - Properties
     
     @AppStorage(DataLocation.defaultsKey) private var defaultDataDirectory: String = ""
     @AppStorage("showDockBadges") private var showDockBadges: Bool = true
@@ -22,8 +19,6 @@ struct SettingsView: View {
     @ObservedObject private var menuBarManager = MenuBarManager.shared
     
     @State private var selectedTab: SettingsTab = .general
-    
-    // MARK: - Body
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -55,15 +50,13 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Settings Tab Enum
-
 enum SettingsTab: String, CaseIterable {
     case general
     case appearance
     case about
 }
 
-// MARK: - General Settings
+// MARK: - General
 
 struct GeneralSettingsTab: View {
     @Binding var defaultDataDirectory: String
@@ -142,7 +135,7 @@ struct GeneralSettingsTab: View {
     }
 }
 
-// MARK: - Appearance Settings
+// MARK: - Appearance
 
 struct AppearanceSettingsTab: View {
     @Binding var showDockBadges: Bool
@@ -164,7 +157,7 @@ struct AppearanceSettingsTab: View {
     }
 }
 
-// MARK: - About Settings
+// MARK: - About
 
 struct AboutSettingsTab: View {
     var body: some View {
@@ -222,8 +215,6 @@ struct AboutSettingsTab: View {
         .padding()
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     SettingsView()

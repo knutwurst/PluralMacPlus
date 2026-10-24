@@ -28,7 +28,6 @@ enum DataFolderPicker {
 /// Asks the user where to put a launcher app.
 enum LauncherFolderPicker {
 
-    /// Default location for launcher apps
     static let applicationsFolder = URL(fileURLWithPath: "/Applications")
 
     static func choose(for instanceName: String, startingAt folder: URL = applicationsFolder) -> URL? {

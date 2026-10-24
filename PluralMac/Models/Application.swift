@@ -9,43 +9,20 @@
 import Foundation
 import AppKit
 
-/// Represents a macOS application that can be used as a target for creating instances.
 struct Application: Identifiable, Codable, Hashable, Sendable {
     
-    // MARK: - Properties
-    
-    /// Unique identifier (usually the bundle identifier)
     let id: String
-    
-    /// Bundle identifier (e.g., "com.google.Chrome")
     let bundleIdentifier: String
-    
-    /// Display name of the application
     let name: String
-    
-    /// Path to the .app bundle
     let path: URL
-    
-    /// Path to the executable binary inside the bundle
     let executablePath: URL
-    
-    /// Detected app type for data isolation strategy
     let appType: AppType
-    
-    /// Version string from Info.plist
     let version: String?
     
-    /// Whether the app is sandboxed (Mac App Store apps)
+    /// App Store receipt found, see checkIfSandboxed
     let isSandboxed: Bool
-    
-    /// Bundle icon file name (for extraction)
     let iconFileName: String?
     
-    // MARK: - Initialization
-    
-    /// Initialize from a bundle URL
-    /// - Parameter url: Path to the .app bundle
-    /// - Throws: ApplicationError if the bundle is invalid or unsupported
     init(from url: URL) throws {
         guard let bundle = Bundle(url: url) else {
             throw ApplicationError.invalidBundle(url)
@@ -59,7 +36,6 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
             throw ApplicationError.missingExecutable(url)
         }
         
-        // Check for Apple system apps
         if bundleId.hasPrefix("com.apple.") {
             throw ApplicationError.systemAppNotSupported(bundleId)
         }
@@ -69,22 +45,17 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
         self.path = url
         self.executablePath = executableURL
         
-        // Get display name (prefer localized name, fallback to bundle name)
         self.name = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? url.deletingPathExtension().lastPathComponent
         
-        // Get version
         self.version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         
-        // Get icon file name
         self.iconFileName = bundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleIconName") as? String
         
-        // Detect if sandboxed
         self.isSandboxed = Self.checkIfSandboxed(bundle: bundle)
         
-        // Detect app type
         self.appType = Self.detectAppType(
             bundleIdentifier: bundleId,
             bundle: bundle,
@@ -92,39 +63,30 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
         )
     }
     
-    // MARK: - Static Detection Methods
+    // MARK: - Detection
     
-    /// Check if an app is sandboxed by looking for entitlements
+    /// Only looks for an App Store receipt. The honest answer is in the entitlements, which would
+    /// mean parsing the code signature. Good enough so far.
     private static func checkIfSandboxed(bundle: Bundle) -> Bool {
-        // Check for App Sandbox entitlement in the code signature
-        // Sandboxed apps have specific container paths
         let bundlePath = bundle.bundlePath
         
-        // Quick heuristic: Mac App Store apps are typically in /Applications
-        // and have receipt files
         let receiptPath = bundle.appStoreReceiptURL
         if let receipt = receiptPath, FileManager.default.fileExists(atPath: receipt.path) {
             return true
         }
         
-        // Check for sandbox container
-        // Apps with "com.apple.security.app-sandbox" entitlement are sandboxed
-        // This is a simplified check - full check would require codesign parsing
         return false
     }
     
-    /// Detect the type of application based on bundle contents and identifier
     private static func detectAppType(
         bundleIdentifier: String,
         bundle: Bundle,
         isSandboxed: Bool
     ) -> AppType {
-        // Sandboxed apps cannot be isolated
         if isSandboxed {
             return .sandboxed
         }
         
-        // Check for known Chromium-based browsers
         let chromiumIdentifiers = [
             "com.google.Chrome",
             "com.google.Chrome.canary",
@@ -141,7 +103,6 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
             return .chromium
         }
         
-        // Check for Firefox-based browsers
         let firefoxIdentifiers = [
             "org.mozilla.firefox",
             "org.mozilla.nightly",
@@ -152,23 +113,19 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
             return .firefox
         }
         
-        // Check for ToDesktop apps (check framework in bundle)
+        // ToDesktop apps ship Electron too, so they go first
         if Self.isToDesktopApp(bundle: bundle) {
             return .toDesktop
         }
         
-        // Check for Electron apps
         if Self.isElectronApp(bundle: bundle) {
             return .electron
         }
         
-        // Default to generic
         return .generic
     }
     
-    /// Check if app is built with ToDesktop
     private static func isToDesktopApp(bundle: Bundle) -> Bool {
-        // ToDesktop apps have specific markers in their bundle
         let frameworksPath = bundle.bundlePath + "/Contents/Frameworks"
         let toDesktopMarkers = [
             "ToDesktop Runtime Helper.app",
@@ -181,7 +138,6 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
             }
         }
         
-        // Also check Info.plist for ToDesktop markers
         if let infoPlist = bundle.infoDictionary {
             if infoPlist["ToDesktopAppId"] != nil || infoPlist["ToDesktopProductId"] != nil {
                 return true
@@ -191,7 +147,6 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
         return false
     }
     
-    /// Check if app is built with Electron
     private static func isElectronApp(bundle: Bundle) -> Bool {
         let frameworksPath = bundle.bundlePath + "/Contents/Frameworks"
         let electronFramework = frameworksPath + "/Electron Framework.framework"
@@ -199,21 +154,15 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
         return FileManager.default.fileExists(atPath: electronFramework)
     }
     
-    // MARK: - Validation
-    
-    /// Validates if this application can be used to create instances
     func validate() throws {
-        // Check if path still exists
         guard FileManager.default.fileExists(atPath: path.path) else {
             throw ApplicationError.appNotFound(path)
         }
         
-        // Check if executable is accessible
         guard FileManager.default.isExecutableFile(atPath: executablePath.path) else {
             throw ApplicationError.executableNotAccessible(executablePath)
         }
         
-        // Check if app type is supported
         guard appType.supportsDataIsolation else {
             throw ApplicationError.unsupportedAppType(appType)
         }
@@ -222,7 +171,6 @@ struct Application: Identifiable, Codable, Hashable, Sendable {
 
 // MARK: - Errors
 
-/// Errors that can occur when working with Applications
 enum ApplicationError: LocalizedError {
     case invalidBundle(URL)
     case missingBundleIdentifier(URL)
@@ -252,21 +200,18 @@ enum ApplicationError: LocalizedError {
     }
 }
 
-// MARK: - Convenience Extensions
+// MARK: - Convenience
 
 extension Application {
-    /// Get the icon image for this application
     @MainActor
     var icon: NSImage? {
         NSWorkspace.shared.icon(forFile: path.path)
     }
     
-    /// Check if this app is a browser
     var isBrowser: Bool {
         appType == .chromium || appType == .firefox
     }
     
-    /// Get recommended command-line arguments for data isolation
     func dataIsolationArguments(dataPath: URL) -> [String] {
         switch appType {
         case .chromium:

@@ -29,9 +29,7 @@ nonisolated struct DataFolderMover {
 
     private let fileManager = FileManager.default
 
-    /// Moves `source` to `<parent>/<folderName>` and returns the new location.
-    /// If `source` does not exist yet (instance never launched), nothing is moved
-    /// and only the new location is returned.
+    /// Returns the new location. If `source` doesn't exist yet (never launched), nothing moves.
     func move(from source: URL, toParent parent: URL, folderName: String, instanceIsRunning: Bool) throws -> URL {
         guard !instanceIsRunning else {
             throw MoveError.instanceRunning

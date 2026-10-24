@@ -7,7 +7,7 @@ final class IsolationEnvironmentTests: XCTestCase {
         AppInstance(name: "Work Profile", application: makeTestApplication(), dataPath: URL(fileURLWithPath: "/Volumes/External/Work"))
     }
 
-    /// Foundation ignores HOME; CFFIXED_USER_HOME redirects NSHomeDirectory, Caches, Application Support, HTTPStorages
+    /// Foundation ignores HOME; CFFIXED_USER_HOME is what moves NSHomeDirectory, Caches, Application Support, HTTPStorages
     func testEnvironmentFixesFoundationHomeToDataFolder() {
         let environment = makeInstance().effectiveEnvironmentVariables
         XCTAssertEqual(environment["CFFIXED_USER_HOME"], "/Volumes/External/Work")

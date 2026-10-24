@@ -10,10 +10,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-/// Detail view showing full information about a selected instance.
 struct InstanceDetailView: View {
-    
-    // MARK: - Properties
     
     let instance: AppInstance
     @Bindable var viewModel: InstanceViewModel
@@ -35,27 +32,21 @@ struct InstanceDetailView: View {
     
     @ObservedObject private var runningManager = RunningInstancesManager.shared
     
-    /// Check if this instance is running
     private var isRunning: Bool {
         runningManager.isRunning(instance.id)
     }
     
-    /// Whether the data folder is currently being moved
     private var isMovingData: Bool {
         viewModel.instancesMovingData.contains(instance.id)
     }
     
-    // MARK: - Body
-    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Header
                 headerSection
                 
                 Divider()
                 
-                // Info sections
                 targetAppSection
                 
                 Divider()
@@ -136,11 +127,10 @@ struct InstanceDetailView: View {
         }
     }
     
-    // MARK: - Header Section
+    // MARK: - Header
     
     private var headerSection: some View {
         HStack(spacing: 16) {
-            // Icon
             Group {
                 if let icon = appIcon {
                     Image(nsImage: icon)
@@ -155,7 +145,6 @@ struct InstanceDetailView: View {
             .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             
-            // Name and type
             VStack(alignment: .leading, spacing: 4) {
                 Text(instance.name)
                     .font(.title)
@@ -173,7 +162,6 @@ struct InstanceDetailView: View {
             
             Spacer()
             
-            // Running status indicator
             if isRunning {
                 HStack(spacing: 6) {
                     Circle()
@@ -189,7 +177,6 @@ struct InstanceDetailView: View {
                 .clipShape(Capsule())
             }
             
-            // Launch or Stop button
             if isRunning {
                 HStack(spacing: 8) {
                     Button {
@@ -202,7 +189,6 @@ struct InstanceDetailView: View {
                     .controlSize(.large)
                     .help("Bring to front and restore minimized windows")
                     
-                    // Stop button
                     Button(role: .destructive) {
                         Task {
                             _ = await viewModel.terminateInstance(instance)
@@ -228,8 +214,6 @@ struct InstanceDetailView: View {
         }
     }
     
-    // MARK: - Target App Section
-    
     private var targetAppSection: some View {
         DetailSection(title: "Target Application") {
             DetailRow(label: "Application", value: targetAppName)
@@ -251,7 +235,7 @@ struct InstanceDetailView: View {
         instance.targetAppPath.deletingPathExtension().lastPathComponent
     }
     
-    // MARK: - Storage Section
+    // MARK: - Storage
     
     private var storageSection: some View {
         DetailSection(title: "Storage") {
@@ -329,9 +313,9 @@ struct InstanceDetailView: View {
         }
     }
     
-    // MARK: - Dock & Icon Section
+    // MARK: - Dock & Icon
     
-    /// Whether the target app blocks injected libraries (Hardened Runtime without opt-in)
+    /// Hardened Runtime without opt-in, injected libraries won't load.
     private var targetBlocksInjection: Bool {
         !PreferencesIsolation.allowsLibraryInjection(appAt: instance.codeAppPath)
     }
@@ -457,14 +441,14 @@ struct InstanceDetailView: View {
         return "Shown in this window and on the launcher app."
     }
     
-    /// Launcher icon in its original colors
+    // untinted, the color picker previews the hue on top of it
     private var launcherBaseIcon: NSImage {
         var untinted = instance
         untinted.launcherIconHue = nil
         return viewModel.launcherIcon(for: untinted)
     }
     
-    // MARK: - Separation Section
+    // MARK: - Separation
     
     private var separationSection: some View {
         DetailSection(title: "Separation") {
@@ -530,9 +514,9 @@ struct InstanceDetailView: View {
             .foregroundStyle(.secondary)
     }
     
-    // MARK: - Launcher Section
+    // MARK: - Launcher
     
-    /// Only shown when the instance has no Dock app or private copy, or still has an old launcher
+    // hidden once there's a Dock app or private copy, unless an old launcher is still lying around
     private var showsLauncherSection: Bool {
         instance.privateCopy == nil || viewModel.hasLauncher(instance)
     }
@@ -586,7 +570,7 @@ struct InstanceDetailView: View {
         }
     }
     
-    // MARK: - Launch Options Section
+    // MARK: - Launch Options
     
     private var launchOptionsSection: some View {
         DetailSection(title: "Environment Variables & Arguments") {
@@ -640,8 +624,6 @@ struct InstanceDetailView: View {
             .frame(width: 520)
         }
     }
-    
-    // MARK: - Timestamps Section
     
     private var timestampsSection: some View {
         DetailSection(title: "Information") {
@@ -760,15 +742,13 @@ struct InstanceDetailView: View {
         }
     }
     
-    // MARK: - Icon Loading
-    
     @MainActor
     private func loadIcon() async {
         appIcon = viewModel.displayIcon(for: instance)
     }
 }
 
-// MARK: - Detail Section
+// MARK: - DetailSection / DetailRow
 
 struct DetailSection<Content: View>: View {
     let title: String
@@ -787,8 +767,6 @@ struct DetailSection<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-
-// MARK: - Detail Row
 
 struct DetailRow: View {
     let label: String
@@ -809,8 +787,6 @@ struct DetailRow: View {
         .font(.body)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     let mockInstance = AppInstance(

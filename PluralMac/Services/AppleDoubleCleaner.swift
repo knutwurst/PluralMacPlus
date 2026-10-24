@@ -7,12 +7,12 @@
 
 import Foundation
 
-/// Removes AppleDouble files ("._name") from instance folders on FAT/exFAT volumes.
+/// Removes AppleDouble "._name" files from instance folders on FAT/exFAT.
 ///
-/// Those file systems can't store extended attributes, so macOS keeps them in "._name" companion
-/// files and deletes the companion together with the file. Apps that delete folders recursively
-/// (enumerate first, then delete) then fail on the companion that already disappeared. Apps from
-/// the internet get com.apple.provenance on every file they write, so this happens constantly.
+/// No xattrs there, so macOS keeps them in "._name" companions and deletes the companion along with
+/// the file. Apps that enumerate a folder first and delete afterwards then trip over a companion that
+/// is already gone. Downloaded apps tag every file they write with com.apple.provenance, so this
+/// happens all the time. exFAT: the gift that keeps on giving.
 nonisolated enum AppleDoubleCleaner {
 
     /// File systems that store extended attributes in AppleDouble files
@@ -32,8 +32,8 @@ nonisolated enum AppleDoubleCleaner {
         return isAppleDoubleFileSystem(type)
     }
 
-    /// Deletes every "._*" file below `folder`; returns how many were removed.
-    /// Uses find(1): FileManager hides "._" files, so it can't see what it should delete.
+    /// Deletes every "._*" below `folder` and returns the count. find(1), because FileManager hides
+    /// "._" files and can't see what it should delete.
     @discardableResult
     static func removeAppleDoubleFiles(in folder: URL) -> Int {
         let process = Process()

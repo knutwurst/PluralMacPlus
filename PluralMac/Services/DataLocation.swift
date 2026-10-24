@@ -13,8 +13,7 @@ nonisolated enum DataLocation {
     /// UserDefaults key of the "Data Directory" setting (empty = default location)
     static let defaultsKey = "defaultDataDirectory"
 
-    /// Base directory for new instance data folders.
-    /// Uses the "Data Directory" setting if set, otherwise `~/Library/PluralMac/Data`.
+    /// The "Data Directory" setting, or `~/Library/PluralMac/Data` when it's empty
     static func baseDirectory(defaults: UserDefaults = .standard) -> URL {
         let setting = defaults.string(forKey: defaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -27,7 +26,7 @@ nonisolated enum DataLocation {
         return URL(fileURLWithPath: expanded)
     }
 
-    /// Returns the volume root (`/Volumes/<name>`) if `url` lives on a volume that is not mounted.
+    /// `/Volumes/<name>` if `url` is on a volume that isn't mounted
     static func unmountedVolume(for url: URL) -> URL? {
         let components = url.standardizedFileURL.pathComponents
         guard components.count >= 3, components[1] == "Volumes" else {

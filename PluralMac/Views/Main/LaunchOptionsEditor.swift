@@ -25,8 +25,6 @@ struct LaunchOptionsEditor: View {
         }
     }
 
-    // MARK: - Environment
-
     private var environmentEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Environment Variables")
@@ -74,8 +72,6 @@ struct LaunchOptionsEditor: View {
         newValue = ""
         variableProblem = nil
     }
-
-    // MARK: - Arguments
 
     private var argumentsEditor: some View {
         VStack(alignment: .leading, spacing: 8) {

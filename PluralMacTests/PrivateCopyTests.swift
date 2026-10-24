@@ -10,8 +10,7 @@ final class PrivateCopyTests: XCTestCase {
         folder = try makeTemporaryDirectory(self)
     }
 
-    /// Hardened fake app with a real Mach-O, restricted and normal entitlements, a provisioning
-    /// profile, an asset-catalog icon name and a localized bundle name
+    /// hardened fake app: real Mach-O, restricted entitlements, provisioning profile, asset-catalog icon, localized name
     private func makeHardenedApp(version: String = "4.0.6") throws -> URL {
         let app = folder.appendingPathComponent("Example.app")
         let contents = app.appendingPathComponent("Contents")
@@ -65,8 +64,6 @@ final class PrivateCopyTests: XCTestCase {
         try XCTUnwrap(NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) as? [String: Any])
     }
 
-    // MARK: - Tests
-
     func testCopyCarriesInstanceNameAndOwnIcon() throws {
         let original = try makeHardenedApp()
         let instance = try makeInstance(app: original)
@@ -101,7 +98,7 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(PreferencesIsolation.allowsLibraryInjection(appAt: copy.path))
         XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
 
-        // The Mach-O keeps the allowed entitlements; the bundle's main executable is the start script
+        // entitlements sit on the Mach-O; the bundle's main executable is the start script
         let entitlements = PreferencesIsolation.entitlements(appAt: copy.path.appendingPathComponent("Contents/MacOS/Example"))
         XCTAssertEqual(entitlements["com.apple.security.device.camera"] as? Bool, true)
         XCTAssertNil(entitlements["keychain-access-groups"])
@@ -145,7 +142,7 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertEqual(try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", copy.path.path]), 0)
     }
 
-    /// Runs the start script up to the exec and checks what the real binary would see
+    /// runs the start script up to the exec and checks what the real binary would see
     func testStartScriptHandsEnvironmentAndDeviceIDToTheApp() throws {
         var instance = try makeInstance(app: try makeHardenedApp())
         instance.hardwareIDOverride = HardwareIdentity.separateID(for: instance.id)
@@ -169,15 +166,14 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(output.contains(instance.hardwareIDOverride!.uuidString), output)
     }
 
-    /// Copies made before the start script had the real binary as main executable, so its
-    /// signature is bound to Info.plist; updating them must re-sign that binary
+    /// older copies signed the real binary against Info.plist; updating them has to re-sign it
     func testUpdatingCopyFromEarlierVersionKeepsValidSignature() throws {
         let original = try makeHardenedApp()
         var instance = try makeInstance(app: original)
         let builder = PrivateCopyBuilder(clonesDirectory: folder.appendingPathComponent("Clones"))
         instance.privateCopy = try builder.build(for: instance, icon: nil)
 
-        // Turn it into an old-style copy: real binary as main executable, signed as the bundle
+        // fake an old-style copy: real binary as main executable, signed as the bundle
         let copy = try XCTUnwrap(instance.privateCopy).path
         let plistURL = copy.appendingPathComponent("Contents/Info.plist")
         let plist = try XCTUnwrap(NSMutableDictionary(contentsOf: plistURL))
@@ -224,7 +220,7 @@ final class PrivateCopyTests: XCTestCase {
         XCTAssertTrue(PrivateCopyBuilder.needsRefresh(instance))
     }
 
-    /// macOS caches app icons per bundle and checks the bundle folder's modification date
+    /// macOS caches icons like a squirrel caches nuts; only a new bundle mtime makes it look again
     func testBuildingAndUpdatingMarkTheBundleAsChanged() throws {
         let original = try makeHardenedApp()
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: original.path)
@@ -272,7 +268,7 @@ final class PrivateCopyTests: XCTestCase {
 }
 
 final class TestHostIsolationTests: XCTestCase {
-    /// The test host is PluralMac Plus itself; it must never load (and modify) the user's instances
+    /// the test host is PluralMac Plus itself and must never load (or touch) the user's instances
     func testTestHostIsDetected() {
         XCTAssertTrue(AppEnvironment.isRunningTests)
     }

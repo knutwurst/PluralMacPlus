@@ -8,17 +8,14 @@
 import Foundation
 import CryptoKit
 
-/// Gives an instance its own hardware UUID.
-///
-/// Some apps derive their device ID from `ioreg … IOPlatformUUID`, run through `/bin/sh`
-/// (e.g. via NSAppleScript "do shell script", which ignores PATH). Two instances then register
-/// as the same device. bash imports functions exported as `BASH_FUNC_<name>%%`, so an exported
-/// `ioreg` wrapper replaces just the platform UUID in the output of the real `ioreg`.
+/// Some apps get their device ID from `ioreg … IOPlatformUUID` through /bin/sh (NSAppleScript's
+/// "do shell script" ignores PATH), so two instances look like one device. bash imports functions
+/// exported as `BASH_FUNC_<name>%%`, so an exported `ioreg` wrapper swaps out just that UUID.
 enum HardwareIdentity {
 
     static let environmentKey = "BASH_FUNC_ioreg%%"
 
-    /// Stable separate ID for an instance, so switching the option off and on keeps the same ID
+    /// derived from the instance ID, so toggling the option off and on keeps the same UUID
     static func separateID(for instanceID: UUID) -> UUID {
         let digest = SHA256.hash(data: Data("PluralMacPlus.hardware-id.\(instanceID.uuidString)".utf8))
         var bytes = Array(digest.prefix(16))
@@ -28,7 +25,7 @@ enum HardwareIdentity {
                            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
     }
 
-    /// Exported bash function that reports `id` as IOPlatformUUID and leaves everything else untouched
+    /// the real ioreg with IOPlatformUUID replaced by `id`, rest untouched
     static func ioregFunction(reporting id: UUID) -> String {
         "() { /usr/sbin/ioreg \"$@\" | /usr/bin/sed 's/\"IOPlatformUUID\" = \"[^\"]*\"/\"IOPlatformUUID\" = \"\(id.uuidString)\"/'; }"
     }

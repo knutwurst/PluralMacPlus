@@ -10,38 +10,21 @@ import Foundation
 import AppKit
 import OSLog
 
-/// Service responsible for launching apps directly as child processes
-/// with custom environment variables. This approach:
-/// 1. Does NOT modify the original app binary
-/// 2. Does NOT require creating bundles
-/// 3. Preserves the original code signature
-/// 4. Avoids anti-tampering protections in CEF/Electron apps
+/// Starts apps with their own environment. The original binary and its signature stay untouched,
+/// so CEF/Electron anti-tamper checks have nothing to complain about.
 actor DirectLauncher {
     
-    // MARK: - Singleton
-    
     static let shared = DirectLauncher()
-    
-    // MARK: - Properties
     
     private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "DirectLauncher")
     private let fileManager = FileManager.default
     
-    // MARK: - Initialization
-    
     private init() {}
     
-    // MARK: - Launch
-    
-    /// Launch an app instance with modified environment using NSWorkspace
-    /// - Parameter instance: The app instance to launch
-    /// - Returns: The NSRunningApplication for tracking
-    /// - Throws: DirectLaunchError if launch fails
     @discardableResult
     func launch(_ instance: AppInstance) async throws -> NSRunningApplication {
         logger.info("Launching instance with NSWorkspace: \(instance.name)")
         
-        // Capture values from instance
         let targetAppPath = instance.launchAppPath
         // A starter has its own bundle ID and no URL schemes, so it can stay registered
         let unregistersCopy = instance.privateCopy.map { !$0.isStarter } ?? false
@@ -54,19 +37,18 @@ actor DirectLauncher {
         // The start script of a copy or starter adds the arguments itself
         let cmdArgs = instance.privateCopy.map { _ in [] } ?? instance.effectiveCommandLineArguments
         
-        // Validate target app exists
         guard fileManager.fileExists(atPath: targetAppPath.path) else {
             throw DirectLaunchError.appNotFound(targetAppPath)
         }
         
-        // Ensure data directory exists (the app creates its own profile folder)
+        // with HOME redirected I build the fake home, otherwise just check the drive is there
         if redirectsHome {
             try prepareDataDirectory(dataPath: dataPath)
         } else if let volume = DataLocation.unmountedVolume(for: dataPath) {
             throw DirectLaunchError.dataVolumeUnavailable(volume)
         }
         
-        // On FAT/exFAT, companion "._*" files break apps that delete folders on startup
+        // FAT/exFAT "._*" companion files break apps that wipe folders on startup
         if let folder = maintainedFolder, FileManager.default.fileExists(atPath: folder.path),
            AppleDoubleCleaner.needsCleanup(at: folder) {
             let removed = AppleDoubleCleaner.removeAppleDoubleFiles(in: folder)
@@ -79,17 +61,15 @@ actor DirectLauncher {
             try PreferencesIsolation.seedPreferences(for: instance)
         }
         
-        // Launch using NSWorkspace - use continuation for callback-based API
         let runningApp: NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 let workspace = NSWorkspace.shared
                 
-                // Create configuration with environment variables
                 let config = NSWorkspace.OpenConfiguration()
                 config.environment = envVars
                 config.arguments = cmdArgs
                 config.activates = true
-                config.createsNewApplicationInstance = true  // Key! Creates new instance
+                config.createsNewApplicationInstance = true  // otherwise macOS just activates the running one
                 
                 workspace.openApplication(
                     at: targetAppPath,
@@ -106,8 +86,8 @@ actor DirectLauncher {
             }
         }
         
-        // Launching registers the copy with LaunchServices once the app has started; unregister it
-        // afterwards so bundle ID and URL schemes point to the original again
+        // LaunchServices registers the copy once it runs. I unregister it again so the bundle ID and
+        // URL schemes point to the original
         if unregistersCopy {
             Task.detached {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -115,10 +95,8 @@ actor DirectLauncher {
             }
         }
         
-        // Store the running app
         runningApps[instanceId] = runningApp
         
-        // Post notification for UI update
         await MainActor.run {
             NotificationCenter.default.post(
                 name: .instanceLaunched,
@@ -129,7 +107,6 @@ actor DirectLauncher {
         
         logger.info("Successfully launched \(instanceName) with PID: \(runningApp.processIdentifier)")
         
-        // Start monitoring for termination
         startMonitoring(instanceId: instanceId, app: runningApp)
         
         return runningApp
@@ -137,10 +114,8 @@ actor DirectLauncher {
     
     // MARK: - Process Management
     
-    /// Active running apps by instance ID
     private var runningApps: [UUID: NSRunningApplication] = [:]
     
-    /// Check if an instance is running
     func isRunning(_ instanceId: UUID) -> Bool {
         guard let app = runningApps[instanceId] else {
             return false
@@ -148,7 +123,7 @@ actor DirectLauncher {
         return !app.isTerminated
     }
     
-    /// Track an instance process that was started elsewhere (before PluralMac Plus was opened, or by a launcher app)
+    /// For instances started elsewhere (before PluralMac Plus was opened, or by a launcher app)
     func adopt(_ instanceId: UUID, pid: pid_t) {
         guard !isRunning(instanceId),
               let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
@@ -169,18 +144,15 @@ actor DirectLauncher {
         startMonitoring(instanceId: instanceId, app: app)
     }
     
-    /// Process ID of a running instance
     func runningPID(_ instanceId: UUID) -> pid_t? {
         guard let app = runningApps[instanceId], !app.isTerminated else { return nil }
         return app.processIdentifier
     }
     
-    /// Get the running app for an instance
     func getRunningApp(_ instanceId: UUID) -> NSRunningApplication? {
         runningApps[instanceId]
     }
     
-    /// Terminate a running instance
     func terminate(_ instanceId: UUID) -> Bool {
         guard let app = runningApps[instanceId], !app.isTerminated else {
             return false
@@ -189,7 +161,6 @@ actor DirectLauncher {
         return app.terminate()
     }
     
-    /// Force terminate a running instance (SIGKILL)
     func forceTerminate(_ instanceId: UUID) -> Bool {
         guard let app = runningApps[instanceId], !app.isTerminated else {
             return false
@@ -198,38 +169,30 @@ actor DirectLauncher {
         return app.forceTerminate()
     }
     
-    /// Get all running instance IDs
     func runningInstanceIds() -> [UUID] {
-        // Clean up terminated apps first
         runningApps = runningApps.filter { !$0.value.isTerminated }
         return Array(runningApps.keys)
     }
     
-    /// Get count of running instances
     func runningCount() -> Int {
         runningApps.filter { !$0.value.isTerminated }.count
     }
     
-    /// Start monitoring an app for termination
     private func startMonitoring(instanceId: UUID, app: NSRunningApplication) {
-        // Use KVO to monitor termination
         Task { @MainActor in
-            // Poll for termination (simpler than KVO in actor context)
+            // polling is simpler than KVO from inside an actor
             while !app.isTerminated {
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             
-            // App terminated
             await self.handleAppTermination(instanceId: instanceId)
         }
     }
     
-    /// Handle app termination
     private func handleAppTermination(instanceId: UUID) {
         logger.info("Instance \(instanceId.uuidString) terminated")
         runningApps.removeValue(forKey: instanceId)
         
-        // Post notification for UI update
         Task { @MainActor in
             NotificationCenter.default.post(
                 name: .instanceTerminated,
@@ -239,14 +202,13 @@ actor DirectLauncher {
         }
     }
     
-    /// Create the data directory with the HOME redirection layout (also used for launcher apps)
+    /// Builds the fake home for HOME redirection (launcher apps use it too)
     func prepareDataDirectory(dataPath: URL) throws {
         // Don't silently start with an empty profile when the data lives on an unplugged drive
         if let volume = DataLocation.unmountedVolume(for: dataPath) {
             throw DirectLaunchError.dataVolumeUnavailable(volume)
         }
         
-        // Create data directory if it doesn't exist
         if !fileManager.fileExists(atPath: dataPath.path) {
             try fileManager.createDirectory(
                 at: dataPath,
@@ -255,10 +217,9 @@ actor DirectLauncher {
             logger.debug("Created data directory: \(dataPath.path)")
         }
         
-        // Create essential symlinks for HOME redirection
         let homeDirectory = fileManager.homeDirectoryForCurrentUser
         
-        // User folders - link to real locations
+        // real user folders stay shared; the keychain too, apps don't find it under a redirected HOME
         let symlinks: [(String, String)] = [
             ("Desktop", "Desktop"),
             ("Documents", "Documents"),
@@ -274,13 +235,11 @@ actor DirectLauncher {
             let linkPath = dataPath.appendingPathComponent(relativePath)
             let targetPath = homeDirectory.appendingPathComponent(targetRelativePath)
             
-            // Create parent directory if needed
             let parentDir = linkPath.deletingLastPathComponent()
             if !fileManager.fileExists(atPath: parentDir.path) {
                 try fileManager.createDirectory(at: parentDir, withIntermediateDirectories: true)
             }
             
-            // Create symlink if target exists and link doesn't
             if fileManager.fileExists(atPath: targetPath.path) &&
                !fileManager.fileExists(atPath: linkPath.path) {
                 try fileManager.createSymbolicLink(at: linkPath, withDestinationURL: targetPath)
@@ -288,7 +247,6 @@ actor DirectLauncher {
             }
         }
         
-        // Create Library subdirectories
         let libraryPaths = [
             "Library",
             "Library/Application Support",

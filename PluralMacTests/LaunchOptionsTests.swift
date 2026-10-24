@@ -3,8 +3,6 @@ import XCTest
 
 final class LaunchOptionsTests: XCTestCase {
 
-    // MARK: - Environment variables
-
     func testAcceptsValidVariableName() {
         XCTAssertNil(LaunchOptions.problem(withVariableName: "MY_FLAG_2"))
     }
@@ -28,8 +26,6 @@ final class LaunchOptionsTests: XCTestCase {
         XCTAssertEqual(instance.effectiveEnvironmentVariables["MY_FLAG"], "1")
     }
 
-    // MARK: - Arguments
-
     func testNormalizedArgumentTrimsWhitespace() {
         XCTAssertEqual(LaunchOptions.normalizedArgument("  --flag  "), "--flag")
     }
@@ -41,8 +37,6 @@ final class LaunchOptionsTests: XCTestCase {
     func testNormalizedArgumentKeepsInnerSpaces() {
         XCTAssertEqual(LaunchOptions.normalizedArgument("--title=two words"), "--title=two words")
     }
-
-    // MARK: - Ordering
 
     func testMovingInstanceChangesOrder() {
         let ids = (0..<4).map { _ in UUID() }
@@ -59,7 +53,7 @@ final class LaunchOptionsTests: XCTestCase {
 }
 
 private extension AppInstance {
-    /// Test helper: same instance with a fixed id
+    /// id is a let, so a fixed one goes in through JSON
     func withID(_ id: UUID) -> AppInstance {
         let data = try! JSONEncoder.iso.encode(self)
         var json = try! JSONSerialization.jsonObject(with: data) as! [String: Any]

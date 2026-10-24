@@ -12,20 +12,15 @@ import SwiftUI
 import Combine
 import OSLog
 
-/// Manages the menu bar (status bar) icon and menu for quick access to instances.
+/// The optional status bar icon with a quick-launch menu.
 @MainActor
 final class MenuBarManager: NSObject, ObservableObject {
-    
-    // MARK: - Singleton
-    
+
     static let shared = MenuBarManager()
-    
-    // MARK: - Properties
-    
+
     private var statusItem: NSStatusItem?
     private let logger = Logger(subsystem: "com.knutwurst.PluralMacPlus", category: "MenuBarManager")
-    
-    /// Whether the menu bar icon is currently shown
+
     @Published var isMenuBarIconVisible: Bool = false {
         didSet {
             if isMenuBarIconVisible {
@@ -35,35 +30,30 @@ final class MenuBarManager: NSObject, ObservableObject {
             }
         }
     }
-    
-    /// Current instances for the menu
+
     @Published var instances: [AppInstance] = []
-    
-    // MARK: - Initialization
-    
+
     private override init() {
         super.init()
     }
-    
-    // MARK: - Setup
-    
-    /// Setup the status bar item
+
+    // MARK: - Status Item
+
     func setupStatusItem() {
         guard statusItem == nil else { return }
-        
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        
+
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "square.stack.3d.up.fill", accessibilityDescription: "PluralMac Plus")
             button.image?.isTemplate = true
             button.toolTip = "PluralMac Plus - Quick Launch"
         }
-        
+
         updateMenu()
         logger.info("Menu bar icon enabled")
     }
-    
-    /// Remove the status bar item
+
     func removeStatusItem() {
         if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
@@ -71,39 +61,35 @@ final class MenuBarManager: NSObject, ObservableObject {
             logger.info("Menu bar icon disabled")
         }
     }
-    
-    /// Update the menu with current instances
+
+    /// Rebuilds the whole menu from `instances`.
     func updateMenu() {
         let menu = NSMenu()
-        
-        // Header
+
         let headerItem = NSMenuItem(title: "PluralMac Plus", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         menu.addItem(headerItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
-        // Quick launch section
+
         if instances.isEmpty {
             let noInstancesItem = NSMenuItem(title: "No instances", action: nil, keyEquivalent: "")
             noInstancesItem.isEnabled = false
             menu.addItem(noInstancesItem)
         } else {
-            // Group instances by target app
             let grouped = Dictionary(grouping: instances) { $0.targetBundleIdentifier }
-            
+
             for (bundleId, appInstances) in grouped.sorted(by: { $0.key < $1.key }) {
-                // App name as section header
                 if let firstInstance = appInstances.first {
                     let appName = firstInstance.targetAppPath.deletingPathExtension().lastPathComponent
-                    
+
+                    // app headers only once there's more than one app to tell apart
                     if grouped.count > 1 {
                         let appHeader = NSMenuItem(title: appName, action: nil, keyEquivalent: "")
                         appHeader.isEnabled = false
                         menu.addItem(appHeader)
                     }
-                    
-                    // Individual instances
+
                     for instance in appInstances.sorted(by: { $0.name < $1.name }) {
                         let item = NSMenuItem(
                             title: instance.name,
@@ -112,27 +98,25 @@ final class MenuBarManager: NSObject, ObservableObject {
                         )
                         item.target = self
                         item.representedObject = instance
-                        
-                        // Load icon
+
                         if instance.shortcutExists {
                             let icon = NSWorkspace.shared.icon(forFile: instance.shortcutPath.path)
                             icon.size = NSSize(width: 16, height: 16)
                             item.image = icon
                         }
-                        
+
                         menu.addItem(item)
                     }
-                    
+
                     if grouped.count > 1 {
                         menu.addItem(NSMenuItem.separator())
                     }
                 }
             }
         }
-        
+
         menu.addItem(NSMenuItem.separator())
-        
-        // Actions section
+
         let createItem = NSMenuItem(
             title: "Create New Instance...",
             action: #selector(showCreateWindow),
@@ -141,10 +125,9 @@ final class MenuBarManager: NSObject, ObservableObject {
         createItem.keyEquivalentModifierMask = [.command, .shift]
         createItem.target = self
         menu.addItem(createItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
-        // Show main window
+
         let showWindowItem = NSMenuItem(
             title: "Show PluralMac Plus",
             action: #selector(showMainWindow),
@@ -152,8 +135,7 @@ final class MenuBarManager: NSObject, ObservableObject {
         )
         showWindowItem.target = self
         menu.addItem(showWindowItem)
-        
-        // Preferences
+
         let preferencesItem = NSMenuItem(
             title: "Preferences...",
             action: #selector(showPreferences),
@@ -161,28 +143,27 @@ final class MenuBarManager: NSObject, ObservableObject {
         )
         preferencesItem.target = self
         menu.addItem(preferencesItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
-        // Quit
+
         let quitItem = NSMenuItem(
             title: "Quit PluralMac Plus",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
         menu.addItem(quitItem)
-        
+
         statusItem?.menu = menu
     }
-    
+
     // MARK: - Actions
-    
+
     @objc private func launchInstance(_ sender: NSMenuItem) {
         guard let instance = sender.representedObject as? AppInstance else { return }
-        
+
         Task {
             do {
-                // Running: bring to front; otherwise launch
+                // already running: just bring it to the front
                 if let pid = await DirectLauncher.shared.runningPID(instance.id),
                    let app = NSRunningApplication(processIdentifier: pid) {
                     InstanceActivator.bringToFront(app)
@@ -195,37 +176,33 @@ final class MenuBarManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     @objc private func showMainWindow() {
         NSApplication.shared.activate(ignoringOtherApps: true)
-        
-        // Find and focus the main window
+
+        // any window except SwiftUI's Settings window
         if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue != "com_apple_SwiftUI_Settings_window" }) {
             window.makeKeyAndOrderFront(nil)
         }
     }
-    
+
     @objc private func showCreateWindow() {
         showMainWindow()
-        
-        // Post notification to show create sheet
+
         NotificationCenter.default.post(name: .showCreateInstance, object: nil)
     }
-    
+
     @objc private func showPreferences() {
         NSApplication.shared.activate(ignoringOtherApps: true)
-        
-        // Open Settings window
+
+        // private selectors, no public API for this. 14+ wants showSettingsWindow:
         if #available(macOS 14.0, *) {
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         } else {
             NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }
     }
-    
-    // MARK: - Instance Updates
-    
-    /// Update the instances displayed in the menu
+
     func updateInstances(_ newInstances: [AppInstance]) {
         self.instances = newInstances
         updateMenu()
