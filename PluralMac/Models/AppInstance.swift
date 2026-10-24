@@ -294,6 +294,7 @@ extension AppInstance {
         case isolationMethodOverride
         case eraseDataOnQuit
         case showMenuBarIcon
+        case notes
         case createdAt
         case modifiedAt
         case lastLaunchedAt

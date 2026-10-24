@@ -62,6 +62,11 @@ actor CompatibilityDatabase {
 
     private init() {}
 
+    /// Keyed by lowercased bundle ID. If the JSON lists an app twice, the first entry wins.
+    static func index(_ applications: [CompatibilityEntry]) -> [String: CompatibilityEntry] {
+        Dictionary(applications.map { ($0.bundleIdentifier.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
     // MARK: - Loading
 
     /// Loads once. A missing or broken file counts as loaded too, so I don't retry on every query.
@@ -78,10 +83,7 @@ actor CompatibilityDatabase {
             let data = try Data(contentsOf: url)
             let database = try JSONDecoder().decode(DatabaseFile.self, from: data)
 
-            // keyed by lowercased bundle ID; a duplicate ID in the JSON traps here
-            entries = Dictionary(
-                uniqueKeysWithValues: database.applications.map { ($0.bundleIdentifier.lowercased(), $0) }
-            )
+            entries = Self.index(database.applications)
 
             isLoaded = true
             logger.info("Loaded compatibility database with \(database.applications.count) entries")

@@ -8,6 +8,7 @@
 
 import Foundation
 import AppKit
+import CryptoKit
 import OSLog
 
 /// Memory + disk cache for app icons, keyed by bundle ID.
@@ -37,7 +38,7 @@ actor IconCache {
     // MARK: - Public
 
     func get(for appURL: URL) -> NSImage? {
-        let key = cacheKey(for: appURL)
+        let key = Self.cacheKey(for: appURL)
 
         if let cached = memoryCache[key], !cached.isExpired {
             logger.debug("Memory cache hit for: \(appURL.lastPathComponent)")
@@ -54,7 +55,7 @@ actor IconCache {
     }
 
     func set(_ image: NSImage, for appURL: URL) {
-        let key = cacheKey(for: appURL)
+        let key = Self.cacheKey(for: appURL)
 
         memoryCache[key] = CachedIcon(image: image)
 
@@ -66,7 +67,7 @@ actor IconCache {
     }
 
     func remove(for appURL: URL) {
-        let key = cacheKey(for: appURL)
+        let key = Self.cacheKey(for: appURL)
 
         memoryCache.removeValue(forKey: key)
 
@@ -87,15 +88,15 @@ actor IconCache {
         }
     }
 
-    private func cacheKey(for appURL: URL) -> String {
+    /// Bundle ID if there is one, otherwise a hash of the path that stays the same across launches.
+    nonisolated static func cacheKey(for appURL: URL) -> String {
         if let bundle = Bundle(url: appURL),
            let bundleId = bundle.bundleIdentifier {
             return bundleId.replacingOccurrences(of: ".", with: "_")
         }
 
-        // hashValue is seeded per launch, so for apps without a bundle ID
-        // the disk cache only survives until PMP quits
-        return String(appURL.path.hashValue)
+        let digest = SHA256.hash(data: Data(appURL.standardizedFileURL.path.utf8))
+        return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
     private func loadFromDisk(key: String) -> NSImage? {
@@ -109,10 +110,7 @@ actor IconCache {
     }
 
     private func saveToDisk(image: NSImage, key: String) {
-        // runs after this method returns, so it only helps the next write
-        Task {
-            await ensureCacheDirectoryExists()
-        }
+        ensureCacheDirectoryExists()
 
         let filePath = cacheDirectory.appendingPathComponent("\(key).png")
 
