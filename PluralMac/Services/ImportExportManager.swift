@@ -8,7 +8,6 @@
 
 import Foundation
 import OSLog
-import UniformTypeIdentifiers
 
 /// Exports and imports instance settings as JSON. Settings only, no app data.
 actor ImportExportManager {
@@ -202,8 +201,3 @@ enum ImportExportError: LocalizedError {
     }
 }
 
-extension UTType {
-    static var pluralMacExport: UTType {
-        UTType(exportedAs: "com.knutwurst.pluralmacplus.export", conformingTo: .json)
-    }
-}

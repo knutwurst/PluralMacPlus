@@ -151,11 +151,6 @@ final class InstanceViewModel {
         }
     }
     
-    func refreshInstances() async {
-        await store.clearCache()
-        await loadInstances()
-    }
-    
     // MARK: - Create
     
     /// dataPath nil = Data Directory setting, launcherFolder nil = no launcher.
@@ -650,30 +645,9 @@ final class InstanceViewModel {
         InstanceActivator.bringToFront(app)
     }
     
-    func isInstanceRunning(_ instance: AppInstance) -> Bool {
-        // careful: blocks the main actor while the Task wants it back. Use checkIsRunning.
-        var isRunning = false
-        let semaphore = DispatchSemaphore(value: 0)
-        Task {
-            isRunning = await directLauncher.isRunning(instance.id)
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return isRunning
-    }
-    
     func terminateInstance(_ instance: AppInstance) async -> Bool {
         logger.info("Terminating instance: \(instance.name)")
         return await directLauncher.terminate(instance.id)
-    }
-    
-    func forceTerminateInstance(_ instance: AppInstance) async -> Bool {
-        logger.info("Force terminating instance: \(instance.name)")
-        return await directLauncher.forceTerminate(instance.id)
-    }
-    
-    func checkIsRunning(_ instance: AppInstance) async -> Bool {
-        await directLauncher.isRunning(instance.id)
     }
     
     // MARK: - Finder
@@ -767,15 +741,6 @@ extension InstanceViewModel {
         selectedInstance = instance
     }
     
-    func isSelected(_ instance: AppInstance) -> Bool {
-        selectedInstance?.id == instance.id
-    }
-    
-    func selectFirstIfNeeded() {
-        if selectedInstance == nil, let first = filteredInstances.first {
-            selectedInstance = first
-        }
-    }
 }
 
 // MARK: - Errors

@@ -102,15 +102,6 @@ actor InstanceStore {
         logger.info("Deleted instance: \(removed.name)")
     }
     
-    func getInstance(id: UUID) async throws -> AppInstance? {
-        let instances = try await loadInstances()
-        return instances.first { $0.id == id }
-    }
-    
-    func clearCache() {
-        cachedInstances = nil
-        logger.debug("Cache cleared")
-    }
 }
 
 enum StoreError: LocalizedError {

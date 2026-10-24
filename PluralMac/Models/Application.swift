@@ -208,18 +208,4 @@ extension Application {
         NSWorkspace.shared.icon(forFile: path.path)
     }
     
-    var isBrowser: Bool {
-        appType == .chromium || appType == .firefox
-    }
-    
-    func dataIsolationArguments(dataPath: URL) -> [String] {
-        switch appType {
-        case .chromium:
-            return ["--user-data-dir=\(dataPath.path)"]
-        case .firefox:
-            return ["-profile", dataPath.path]
-        default:
-            return []
-        }
-    }
 }

@@ -76,50 +76,6 @@ actor IconCache {
         logger.debug("Removed cached icon for: \(appURL.lastPathComponent)")
     }
 
-    func clearAll() {
-        memoryCache.removeAll()
-
-        if let contents = try? fileManager.contentsOfDirectory(
-            at: cacheDirectory,
-            includingPropertiesForKeys: nil
-        ) {
-            for file in contents {
-                try? fileManager.removeItem(at: file)
-            }
-        }
-
-        logger.info("Cleared all cached icons")
-    }
-
-    func diskCacheSize() -> Int64 {
-        guard let contents = try? fileManager.contentsOfDirectory(
-            at: cacheDirectory,
-            includingPropertiesForKeys: [.fileSizeKey]
-        ) else {
-            return 0
-        }
-
-        var totalSize: Int64 = 0
-        for file in contents {
-            if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                totalSize += Int64(size)
-            }
-        }
-
-        return totalSize
-    }
-
-    func cachedIconCount() -> Int {
-        guard let contents = try? fileManager.contentsOfDirectory(
-            at: cacheDirectory,
-            includingPropertiesForKeys: nil
-        ) else {
-            return 0
-        }
-
-        return contents.filter { $0.pathExtension == "png" }.count
-    }
-
     // MARK: - Private
 
     private func ensureCacheDirectoryExists() {

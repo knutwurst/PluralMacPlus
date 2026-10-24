@@ -149,10 +149,6 @@ actor DirectLauncher {
         return app.processIdentifier
     }
     
-    func getRunningApp(_ instanceId: UUID) -> NSRunningApplication? {
-        runningApps[instanceId]
-    }
-    
     func terminate(_ instanceId: UUID) -> Bool {
         guard let app = runningApps[instanceId], !app.isTerminated else {
             return false
@@ -172,10 +168,6 @@ actor DirectLauncher {
     func runningInstanceIds() -> [UUID] {
         runningApps = runningApps.filter { !$0.value.isTerminated }
         return Array(runningApps.keys)
-    }
-    
-    func runningCount() -> Int {
-        runningApps.filter { !$0.value.isTerminated }.count
     }
     
     private func startMonitoring(instanceId: UUID, app: NSRunningApplication) {

@@ -52,15 +52,6 @@ actor CompatibilityDatabase {
             }
         }
 
-        var isolationMethodEnum: DataIsolationMethod {
-            switch isolationMethod {
-            case "userDataDir": return .userDataDir
-            case "profile", "profileArgument": return .profileArgument
-            case "homeRedirection": return .homeRedirection
-            case "none": return .none
-            default: return .homeRedirection
-            }
-        }
     }
 
     private struct DatabaseFile: Codable {
@@ -107,10 +98,6 @@ actor CompatibilityDatabase {
         return entries[bundleId.lowercased()]
     }
 
-    func isKnown(bundleId: String) async -> Bool {
-        await entry(for: bundleId) != nil
-    }
-
     /// Unknown apps come back as .partial.
     func compatibilityLevel(for bundleId: String) async -> CompatibilityLevel {
         if let entry = await entry(for: bundleId) {
@@ -119,24 +106,9 @@ actor CompatibilityDatabase {
         return .partial
     }
 
-    func recommendedSettings(for bundleId: String) async -> (AppType, DataIsolationMethod, [String])? {
-        guard let entry = await entry(for: bundleId) else { return nil }
-
-        return (
-            entry.appTypeEnum,
-            entry.isolationMethodEnum,
-            entry.recommendedArguments
-        )
-    }
-
     func apps(ofType type: AppType) async -> [CompatibilityEntry] {
         await load()
         return entries.values.filter { $0.appTypeEnum == type }
-    }
-
-    func fullyCompatibleApps() async -> [CompatibilityEntry] {
-        await load()
-        return entries.values.filter { $0.compatibilityLevelEnum == .full }
     }
 
     func notes(for bundleId: String) async -> String? {
@@ -146,14 +118,4 @@ actor CompatibilityDatabase {
 
 extension Application {
 
-    /// Database entry if there is one, otherwise whatever the detected app type implies.
-    func checkCompatibility() async -> (level: CompatibilityLevel, notes: String?) {
-        let db = CompatibilityDatabase.shared
-
-        if let entry = await db.entry(for: bundleIdentifier) {
-            return (entry.compatibilityLevelEnum, entry.notes)
-        }
-
-        return (appType.compatibilityLevel, nil)
-    }
 }

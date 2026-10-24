@@ -85,77 +85,6 @@ actor IconExtractor {
 
     // MARK: - Conversion
 
-    /// Despite the name this returns PNG data, not a real ICNS. Use saveAsICNS for that.
-    func convertToICNS(image: NSImage) throws -> Data {
-        let sizes = [16, 32, 64, 128, 256, 512, 1024]
-
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData) else {
-            throw IconError.conversionFailed("Could not get bitmap representation")
-        }
-
-        guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            throw IconError.conversionFailed("Could not create PNG representation")
-        }
-
-        return pngData
-    }
-
-    /// Renders an .iconset into a temp dir and runs iconutil on it.
-    func saveAsICNS(image: NSImage, to destination: URL) async throws {
-        logger.debug("Saving ICNS to: \(destination.path)")
-
-        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let iconsetPath = tempDir.appendingPathComponent("AppIcon.iconset")
-
-        try fileManager.createDirectory(at: iconsetPath, withIntermediateDirectories: true)
-
-        defer {
-            try? fileManager.removeItem(at: tempDir)
-        }
-
-        // the exact names iconutil expects
-        let iconSizes: [(name: String, size: Int, scale: Int)] = [
-            ("icon_16x16", 16, 1),
-            ("icon_16x16@2x", 16, 2),
-            ("icon_32x32", 32, 1),
-            ("icon_32x32@2x", 32, 2),
-            ("icon_128x128", 128, 1),
-            ("icon_128x128@2x", 128, 2),
-            ("icon_256x256", 256, 1),
-            ("icon_256x256@2x", 256, 2),
-            ("icon_512x512", 512, 1),
-            ("icon_512x512@2x", 512, 2),
-        ]
-
-        for iconSize in iconSizes {
-            let pixelSize = iconSize.size * iconSize.scale
-            let resized = resizeImage(image, to: NSSize(width: pixelSize, height: pixelSize))
-
-            guard let tiffData = resized.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiffData),
-                  let pngData = bitmap.representation(using: .png, properties: [:]) else {
-                continue
-            }
-
-            let filePath = iconsetPath.appendingPathComponent("\(iconSize.name).png")
-            try pngData.write(to: filePath)
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
-        process.arguments = ["-c", "icns", iconsetPath.path, "-o", destination.path]
-
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw IconError.iconutilFailed(process.terminationStatus)
-        }
-
-        logger.info("Successfully created ICNS at: \(destination.path)")
-    }
-
     func saveAsPNG(image: NSImage, to destination: URL, size: Int? = nil) throws {
         var imageToSave = image
 
@@ -193,91 +122,20 @@ actor IconExtractor {
         return newImage
     }
 
-    /// Badge is drawn at 40% of the icon size.
-    func addBadge(to baseIcon: NSImage, badge: NSImage, position: BadgePosition = .bottomRight) -> NSImage {
-        let size = baseIcon.size
-        let badgeSize = NSSize(width: size.width * 0.4, height: size.height * 0.4)
-
-        let newImage = NSImage(size: size)
-        newImage.lockFocus()
-
-        baseIcon.draw(
-            in: NSRect(origin: .zero, size: size),
-            from: NSRect(origin: .zero, size: baseIcon.size),
-            operation: .copy,
-            fraction: 1.0
-        )
-
-        // AppKit coordinates, y = 0 is the bottom
-        let badgeOrigin: NSPoint
-        switch position {
-        case .topRight:
-            badgeOrigin = NSPoint(x: size.width - badgeSize.width, y: size.height - badgeSize.height)
-        case .topLeft:
-            badgeOrigin = NSPoint(x: 0, y: size.height - badgeSize.height)
-        case .bottomRight:
-            badgeOrigin = NSPoint(x: size.width - badgeSize.width, y: 0)
-        case .bottomLeft:
-            badgeOrigin = NSPoint(x: 0, y: 0)
-        }
-
-        badge.draw(
-            in: NSRect(origin: badgeOrigin, size: badgeSize),
-            from: NSRect(origin: .zero, size: badge.size),
-            operation: .sourceOver,
-            fraction: 1.0
-        )
-
-        newImage.unlockFocus()
-
-        return newImage
-    }
-
     // MARK: - Custom Icons
 
-    /// Anything NSImage can read: PNG, ICNS, JPEG, ...
-    func loadCustomIcon(from url: URL) throws -> NSImage {
-        guard fileManager.fileExists(atPath: url.path) else {
-            throw IconError.fileNotFound(url)
-        }
-
-        guard let image = NSImage(contentsOf: url) else {
-            throw IconError.invalidImageFile(url)
-        }
-
-        logger.debug("Loaded custom icon from: \(url.path)")
-        return image
-    }
 }
 
-enum BadgePosition {
-    case topRight
-    case topLeft
-    case bottomRight
-    case bottomLeft
-}
 
 // MARK: - Errors
 
 enum IconError: LocalizedError {
-    case extractionFailed(URL)
     case conversionFailed(String)
-    case iconutilFailed(Int32)
-    case fileNotFound(URL)
-    case invalidImageFile(URL)
 
     var errorDescription: String? {
         switch self {
-        case .extractionFailed(let url):
-            return "Failed to extract icon from: \(url.path)"
         case .conversionFailed(let message):
             return "Icon conversion failed: \(message)"
-        case .iconutilFailed(let code):
-            return "iconutil failed with exit code: \(code)"
-        case .fileNotFound(let url):
-            return "Icon file not found: \(url.path)"
-        case .invalidImageFile(let url):
-            return "Invalid image file: \(url.path)"
         }
     }
 }

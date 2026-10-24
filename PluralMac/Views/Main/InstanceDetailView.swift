@@ -20,7 +20,6 @@ struct InstanceDetailView: View {
     @State private var newName: String = ""
     @State private var showDeleteConfirmation = false
     @State private var deleteData = false
-    @State private var showExportSheet = false
     @State private var showDuplicateSheet = false
     @State private var duplicateName: String = ""
     @State private var launcherIconHue: Double?

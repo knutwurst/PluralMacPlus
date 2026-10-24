@@ -105,13 +105,6 @@ enum CompatibilityLevel: String, Codable, Sendable {
         }
     }
     
-    var colorName: String {
-        switch self {
-        case .full: return "green"
-        case .partial: return "blue"
-        case .unsupported: return "red"
-        }
-    }
 }
 
 extension CompatibilityLevel {

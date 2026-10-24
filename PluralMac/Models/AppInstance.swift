@@ -129,10 +129,6 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         FileManager.default.fileExists(atPath: shortcutPath.path)
     }
     
-    var dataDirectoryExists: Bool {
-        FileManager.default.fileExists(atPath: dataPath.path)
-    }
-    
     /// Argument-isolated apps keep the real HOME. A redirected HOME hides the login keychain, new
     /// items (Electron's safe storage key) fail and the app falls back to an unencrypted key.
     var redirectsHome: Bool {
@@ -244,26 +240,11 @@ struct AppInstance: Identifiable, Codable, Hashable, Sendable {
         touch()
     }
     
-    mutating func setEnvironmentVariable(_ key: String, value: String) {
-        environmentVariables[key] = value
-        touch()
-    }
-    
-    mutating func removeEnvironmentVariable(_ key: String) {
-        environmentVariables.removeValue(forKey: key)
-        touch()
-    }
-    
     mutating func addArgument(_ argument: String) {
         if !commandLineArguments.contains(argument) {
             commandLineArguments.append(argument)
             touch()
         }
-    }
-    
-    mutating func removeArgument(_ argument: String) {
-        commandLineArguments.removeAll { $0 == argument }
-        touch()
     }
     
     // MARK: - Helpers
